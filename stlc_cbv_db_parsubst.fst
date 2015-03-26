@@ -161,7 +161,7 @@ opaque val progress : #e:exp -> #t:typ -> h:typing empty e t ->
                Pure (cexists (fun e' -> step e e'))
                     (requires (not (is_value e)))
                     (ensures (fun _ -> True)) (decreases h)
-<<<<<<< HEAD
+
 let rec progress _ _ h =
   match h with
   | TyApp #g #e1 #e2 #t11 #t12 h1 h2 ->
@@ -171,16 +171,6 @@ let rec progress _ _ h =
 			   | ExIntro e2' h2' -> ExIntro (EApp e1 e2') (SApp2 e1 h2'))
      | _          -> (match progress h1 with
                       | ExIntro e1' h1' -> ExIntro (EApp e1' e2) (SApp1 e2 h1'))
-=======
-let rec progress _ _ h = magic()
-  (* match h with *)
-  (* | TyApp #g #e1 #e2 #t11 #t12 h1 h2 -> *)
-  (*    match e1 with *)
-  (*    | ELam t e1' -> ExIntro (subst_beta e2 e1') (SBeta t e1' e2) *)
-  (*    | _          -> (match progress h1 with *)
-  (*                     | ExIntro e1' h1' -> ExIntro (EApp e1' e2) (SApp1 e2 h1')) *)
->>>>>>> a5d8905967ae647a23ba97e60143a8f528899a96
-
 
 (* Typing extensional (weaker) and context invariance (stronger) lemmas *)
 
