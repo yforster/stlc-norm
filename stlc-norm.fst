@@ -40,7 +40,12 @@ val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
 let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
 
 val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
-let step_deterministic = admit()                                                             
+let rec step_deterministic e e' e'' step1 step2 = 
+  match step1, step2 with
+  | SApp1 #fe1 fe2 #fe1' fstep_e1, SApp1 #se1 se2 #se1' sstep_e1 ->
+     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1
+  | _ -> admit()
+									    
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))           
 let rec step_preserves_halting e e' s_e_e' =
@@ -209,4 +214,5 @@ val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
       halts e
-let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)       
+
+let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)
