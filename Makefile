@@ -1,6 +1,9 @@
-FSTAR_HOME=/home/yannick/Code/fstar
-FSTAR_BIN=fstar
-FSTAR=$(FSTAR_HOME)/bin/$(FSTAR_BIN) --n_cores 1 --max_fuel 1 --max_ifuel 1 --fstar_home $(FSTAR_HOME) --print_implicits
+include Makefile.include
+
+#FSTAR_HOME=/opt/FStar
+#FSTAR_BIN=fstar.exe
+#FSTAR_MONO=mono
+FSTAR=$(FSTAR_MONO) $(FSTAR_HOME)/bin/$(FSTAR_BIN) --n_cores 1 --max_fuel 1 --max_ifuel 1 --fstar_home $(FSTAR_HOME) --print_implicits
 
 all : stlc-norm
 
