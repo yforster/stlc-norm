@@ -148,9 +148,19 @@ let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                          let ExIntro s h1 = r1 x t in
                                          ExIntro s (red_typable_empty h1))
 
+type ered (t : typ) (e : exp) = e':exp -> step e e' -> red t e'
+
+val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} ->
+                  (u:exp -> typing empty u t2 -> ered t2 u ->
+                   Tot (red t2 u) (requires (not (is_value u))) (ensures True)) ->
+                  typing empty e (TArr t1 t2) ->
+                  ered (TArr t1 t2) e ->
+                  e':exp -> red t1 e' -> red t2 (EApp e e')
+let red_term_ap = admit()                  
+
 val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
                      typing empty e t ->
-                     (e':exp -> step e e' -> Tot (red t e')) ->
+                     ered t e ->
                      red t e
 let red_exp_closed t e ty_t f =
   match t with
@@ -169,8 +179,6 @@ let red_beta t1 t2 x e ty_t2 f e' red_e =
   | Multi_refl _ -> admit()
   | Multi_step _ e'' _ s_e'_e'' _ -> admit() in
   admit()
-                     
-  
                      
 (* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
 (*                            red2 g sigma -> *)
