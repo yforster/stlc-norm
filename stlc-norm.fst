@@ -56,7 +56,7 @@ let rec step_preserves_halting e e' s_e_e' =
   in                                          
     Conj p1 p2
 
-val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e -> Tot (red t e') (decreases t)         
+val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e -> Tot (red t e') (decreases t)
 let rec step_preserves_red e e' s_e_e' t h =
   match t with
   | TArr t1 t2 ->
@@ -69,7 +69,7 @@ let rec step_preserves_red e e' s_e_e' t h =
 
        R_arrow t1 t2 has_typ_e' p ff
                             
-val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e')     (decreases b)
+val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
 let rec steps_preserves_red e e' st_e_e' t h = 
   match st_e_e' with
   | Multi_refl e''1 -> h
@@ -95,13 +95,13 @@ val steps_preserves_red' : e:exp -> e':exp -> steps e e' -> t:typ -> typing empt
 let rec steps_preserves_red' e e' s_e_e' t ty_t h = admit()
 
 type red2 (g:env) (sigma:sub) =
-    (forall x t. g x = Some t ==> (exists e. sigma x = e /\ red t e)) /\
-    (forall x e. sigma x = e /\ EVar x <> e ==> (exists t. g x = Some t /\ red t e))
+    cand (x : var -> t : typ -> Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e})))
+         (x : var -> e : exp -> Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t})))
                 
 (* Definition R' (Gamma:ctx) (theta:sub) : Prop := *)
 (* (forall x S, Gamma x = Some S -> exists s, theta x = Some s /\ R S s) *)
 (* /\ *)
-(* (forall x s, theta x = Some s -> exists S, Gamma x = Some S /\ R S s). *)                                                         
+(* (forall x s, theta x = Some s -> exists S, Gamma x = Some S /\ R S s). *)
 (* type closed2 (sigma:sub) = (forall x e.sigma x = e /\ x <> e ==> closed e) *)
 
 (* val red_closed2 : sigma:sub -> g:env -> red2 g sigma -> Tot (closed'                              *)
@@ -109,27 +109,78 @@ type red2 (g:env) (sigma:sub) =
 (* Lemma R_implies_closed': forall theta Gamma, *)
 (*   R' Gamma theta -> closed' theta.                              *)
 
+assume val doassume : p:Type -> Lemma (p)   
+
+val substitution_lemma' : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
+                          typing g e t ->
+                          (x:var -> t:typ -> g'':env -> Tot (typing g'' (sigma x) t)
+                                                            (requires (g x == Some t /\ sigma x <> EVar x))
+                                                            (ensures True)) ->
+                          (x:var -> t:typ -> Lemma (requires (g x == Some t /\ sigma x == EVar x))
+                                                   (ensures (g' x == Some t))) ->
+                          Tot (typing g' (subst sigma e) t)
+let rec substitution_lemma' g g' e t sigma ty_g h1 h2 =
+  match ty_g with
+  | TyVar x -> if sigma x <> EVar x then h1 x t g' else (h2 x t; TyVar x)
+  | TyApp #g_ #e1 #e2 ih1 ih2 -> TyApp (substitution_lemma' g' sigma ih1 h1 (fun x t -> h2 x t)) (substitution_lemma' g' sigma ih2 h1 (fun x t -> h2 x t))
+  | TyLam #g t1 #e1 #t2 ih1 ->
+     let subst_elam : y:var -> Tot (e:exp{renaming sigma ==> is_EVar e}) =
+       fun y -> if y=0 then EVar y
+                else subst sub_inc (sigma (y-1)) in
+     let (u:unit{ (subst sigma (ELam t1 e1) == ELam t1 (subst subst_elam e1)) }) = admit() in
+     TyLam t1 (substitution_lemma' (extend g' 0 t1) subst_elam ih1 (h1) h2)
+
+val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
+                         typing g e t ->
+                         (x:var -> t:typ -> Tot (cexists (fun e -> h:(typing empty e t){g x == Some t ==> sigma x == e}))) ->
+                         Tot (typing g' (subst sigma e) t)
+let rec substitution_lemma g g' e t sigma ty_g h2 =                             
+  substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
+                                                      ExIntro s h -> let (u:unit{g x == Some t}) = admit() in
+                                                                     typing_extensional h g'')
+                                    (fun x t -> match h2 x t with ExIntro s h -> ())                      
+                      
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
                 typing g e t ->
                 red2 g sigma ->
                 typing empty (subst sigma e) t
-let red_subst g e t sigma ty_t r = admit()
+let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
+                                        (fun x t ->
+                                         let Conj r1 r2 = r in
+                                         let ExIntro s h1 = r1 x t in
+                                         ExIntro s (red_typable_empty h1))
+
+(* val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} -> *)
+(*                      typing empty e t *)
+(*                      (e':exp -> step e e' -> Tot (red t e')) -> *)
+(*                      red t e *)
+(* let red_exp_closed t e ty_t f = *)
+(*   match t with *)
+(*   | TArr t1 t2 -> R_arrow ty_t (\* (red_halts (step_preserves_red'  *\) (magic()) (magic()) *)
+                                        
+(* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
+(*                            red2 g sigma -> *)
+(*                            red t e -> *)
+(*                            red2 (extend g x t) (update sigma x t) *)
   
 val main :
-      #x:var -> #e:exp -> #t:typ -> #t':typ -> #v:exp -> #g:env ->
-      sigma:sub{red2 g sigma} ->                                        
+      #x:var -> #e:exp -> #t:typ -> #t':typ -> #v:exp -> #g:env -> sigma:sub ->
+      red2 g sigma ->
       typing g e t ->
       red t (subst sigma e)
 let main = admit()          
 
+val id : sub
 let id (x : var) = EVar x
+                        
+val subst_id : e:exp -> Lemma (subst id e = e)
+let rec subst_id e = using_induction_hyp subst_id
 
-(* val red2_id_empty : Lemma (red2 empty id)                         *)
-
-assume val subst_id : e:exp -> Lemma (subst id e = e)                        
+val red2_id_empty : red2 empty id
+let red2_id_empty = admit()                         
           
 val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
       halts e
-let normalization e t ty = subst_id e; red_halts (main id ty)       
+let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)       

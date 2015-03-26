@@ -288,38 +288,40 @@ Qed.
 
 
 Lemma substitution_lemma' : forall Gamma t T theta Gamma',
-  type Gamma t T ->
-  (forall x S s, Gamma x = Some S -> theta x = Some s -> forall Gamma'', type Gamma'' s S) ->
-  (forall x S, Gamma x = Some S -> theta x = None -> Gamma' x = Some S) ->
-  type Gamma' (simsubst theta t) T.
-intros Gamma t T theta Gamma' H. revert theta Gamma'. induction H; intros theta Gamma'.
-intros H1 H2.
-simpl. case_eq (theta x).
-intros t H3. apply (H1 x); eauto.
-eauto using type.
-intros H1 H2. constructor. fold simsubst. apply IHtype.
-intros y T' t'. unfold update,drop. case_eq (beq_var x y).
-discriminate.
-intros _. apply (H1 y).
-intros y T'. unfold update,drop. case_eq (beq_var x y).
-eauto.
-intros _. apply (H2 y).
-intros H1 H2. simpl. apply typeA with (S := S).
-eauto.
-eauto.
+               type Gamma t T ->
+               (forall x S s, Gamma x = Some S -> theta x = Some s -> forall Gamma'', type Gamma'' s S) ->
+               (forall x S, Gamma x = Some S -> theta x = None -> Gamma' x = Some S) ->
+               type Gamma' (simsubst theta t) T.
+Proof.
+  intros Gamma t T theta Gamma' H. revert theta Gamma'. induction H; intros theta Gamma'.
+  - intros H1 H2.
+    simpl. case_eq (theta x).
+    intros t H3. apply (H1 x); eauto.
+    intros H3. econstructor. eapply H2. eassumption. eassumption.
+  - intros H1 H2. simpl. constructor. apply IHtype.
+    + intros y T' t'. unfold update,drop. case_eq (beq_var x y).
+      discriminate.
+      intros _. apply (H1 y).
+    + intros y T'. unfold update,drop. case_eq (beq_var x y).
+      eauto.
+    intros _. apply (H2 y).
+  - intros H1 H2. simpl. apply typeA with (S := S).
+    eapply IHtype1. eassumption. eassumption.
+    eauto.
 Qed.
 
 Lemma substitution_lemma : forall Gamma t T theta,
   type Gamma t T ->
   (forall x S, Gamma x = Some S -> exists s, theta x = Some s /\ type empty s S) ->
   type empty (simsubst theta t) T.
+Proof.
 intros Gamma t T theta H1 H2.
 apply substitution_lemma' with (Gamma := Gamma) (theta := theta) (Gamma' := empty).
-assumption.
-intros x S s H3 H4. destruct (H2 x S H3) as [s' [H5 H6]].
-rewrite H4 in H5. inv H5. apply type_empty. assumption.
-intros x S H3 H4. destruct (H2 x S H3) as [s' [H5 H6]].
-rewrite H4 in H5. discriminate.
+- assumption.
+- intros x S s H3 H4. destruct (H2 x S H3) as [s' [H5 H6]].
+  rewrite H4 in H5. inv H5. apply type_empty. assumption.
+- intros x S H3 H4. destruct (H2 x S H3) as [s' [H5 H6]].
+  rewrite H4 in H5. discriminate.
 Qed.
 
 
@@ -381,13 +383,15 @@ Qed.
 
 Lemma R_substitution_lemma : forall Gamma t T theta,
   type Gamma t T -> R' Gamma theta -> type empty (simsubst theta t) T.
-Proof. intros Gamma t T theta H1 [H2 H3].
+Proof.
+  intros Gamma t T theta H1 [H2 H3].
   apply substitution_lemma with (Gamma := Gamma).
-  assumption.
-  intros x S H4.
-  destruct (H2 x S H4) as [s [H5 H6]].
-  exists s. split. assumption.
-  apply R_typed. assumption.
+  - assumption.
+  - intros x S H4.
+    destruct (H2 x S H4) as [s [H5 H6]].
+    exists s. split.
+    + assumption.
+    + apply R_typed. assumption.
 Qed.
 
 Lemma R_preserving_context_update: forall Gamma theta T x t,
@@ -446,16 +450,17 @@ Qed.
 Lemma R_exp_closed : forall T t, type empty t T ->
   ~value t ->
   E T t -> R T t.
-induction T.
-intros t H1 H2 H3.
-split. assumption. constructor. intros t' H4. apply R_ter with (T := tyX).
-apply H3. assumption.
-intros t H1 H2 H3.
-split. assumption. split. constructor. intros t' H4. apply R_ter with (T := (tyA T1 T2)).
-apply H3. assumption.
-
-intros s H4. apply (R_term_ap IHT2 H1 H2 H3).
-assumption.
+Proof.
+  induction T.
+  - intros t H1 H2 H3.
+  split. assumption. constructor. intros t' H4. apply R_ter with (T := tyX).
+  apply H3. assumption.
+  - intros t H1 H2 H3. simpl. do 2 (try split).
+    + assumption.
+    + constructor. intros t' H4. apply R_ter with (T := (tyA T1 T2)).
+      apply H3. assumption.
+    + intros s H4. apply (R_term_ap IHT2 H1 H2 H3).
+      assumption.
 Qed.
 
 Lemma R_beta : forall S T x t, type (update empty x S) t T ->
