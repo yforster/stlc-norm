@@ -109,8 +109,6 @@ type red2 (g:env) (sigma:sub) =
 (* Lemma R_implies_closed': forall theta Gamma, *)
 (*   R' Gamma theta -> closed' theta.                              *)
 
-assume val doassume : p:Type -> Lemma (p)   
-
 val substitution_lemma' : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                           typing g e t ->
                           (x:var -> t:typ -> g'':env -> Tot (typing g'' (sigma x) t)
@@ -150,14 +148,30 @@ let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                          let ExIntro s h1 = r1 x t in
                                          ExIntro s (red_typable_empty h1))
 
-(* val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} -> *)
-(*                      typing empty e t *)
-(*                      (e':exp -> step e e' -> Tot (red t e')) -> *)
-(*                      red t e *)
-(* let red_exp_closed t e ty_t f = *)
-(*   match t with *)
-(*   | TArr t1 t2 -> R_arrow ty_t (\* (red_halts (step_preserves_red'  *\) (magic()) (magic()) *)
-                                        
+val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
+                     typing empty e t ->
+                     (e':exp -> step e e' -> Tot (red t e')) ->
+                     red t e
+let red_exp_closed t e ty_t f =
+  match t with
+  | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
+                  R_arrow t1 t2 ty_t (red_halts (step_preserves_red' e e' h t ty_t (f e' h)))
+                          (fun e' r_e' -> magic())
+
+val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
+               typing (extend empty x t1) e t2 ->
+               (e' : exp -> red t1 e' -> Tot ( red t2 (subst_beta_gen x e' e))) ->
+               e' : exp -> red t1 e' -> red t2 (EApp (ELam t1 e) e')
+let red_beta t1 t2 x e ty_t2 f e' red_e =
+  let ExIntro v h = red_halts red_e in
+  let rec induction ter =
+  match h with
+  | Multi_refl _ -> admit()
+  | Multi_step _ e'' _ s_e'_e'' _ -> admit() in
+  admit()
+                     
+  
+                     
 (* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
 (*                            red2 g sigma -> *)
 (*                            red t e -> *)
