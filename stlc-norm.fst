@@ -16,7 +16,7 @@ F* should have similar problems as soon as we start checking
 for negative occurrences. Hopefully by then we will also have
 a solution for this. *)
 type red : typ -> exp -> Type =
-(* | R_bool : e:exp -> typing empty e TBool -> halts e -> red TBool e *)
+| R_bool :  #e:exp -> typing empty e TBool -> halts e -> red TBool e
 | R_arrow : t1:typ -> t2:typ -> #e:exp ->
             typing empty e (TArr t1 t2) ->
             halts e ->
@@ -34,10 +34,16 @@ val value_normal : v:exp{is_value v} -> Tot (halts v)
 let value_normal v = match v with ELam _ _ -> ExIntro v (Multi_refl v)
                 
 val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
-let red_halts t e h = match h with R_arrow _ _ _ hh _ -> hh
+let red_halts t e h =
+  match h with
+  | R_arrow _ _ _ hh _ -> hh
+  | R_bool _ hh -> hh
                                                            
 val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
-let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
+let red_typable_empty t e h =
+  match h with
+  | R_arrow k1 k2 ht k3 k4 -> ht
+  | R_bool t_e ht -> t_e
 
 val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
 let rec step_deterministic e e' e'' step1 step2 =
@@ -81,18 +87,29 @@ let rec step_preserves_halting e e' s_e_e' =
   in                                          
     Conj p1 p2
 
-val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e -> Tot (red t e') (decreases t)
+val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e ->
+				     Tot (red t e') (decreases t)
 let rec step_preserves_red e e' s_e_e' t h =
   match t with
   | TArr t1 t2 ->
-     match h with R_arrow t1 t2 ty_e h_e f ->
-       let has_typ_e' : (typing empty e' t) = preservation s_e_e' ty_e in
-       let p : (halts e') = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pa h_e in
-       let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e' e''))) =
-         fun e'' red_t1_e'' -> let h' : (red t2 (EApp e e'')) = f e'' red_t1_e'' in
-                               step_preserves_red (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 h'  in
-
-       R_arrow t1 t2 has_typ_e' p ff
+     (match h with
+      | R_bool t_e ht -> R_bool t_e (red_halts h) 
+      | R_arrow t1 t2 ty_e h_e f ->
+	let has_typ_e' : (typing empty e' t) = preservation s_e_e' ty_e in
+	let p : (halts e') = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pa h_e in
+	let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e' e''))) =
+          fun e'' red_t1_e'' -> let h' : (red t2 (EApp e e'')) = f e'' red_t1_e'' in
+				step_preserves_red (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 h'	in
+	R_arrow t1 t2 has_typ_e' p ff)
+  | TBool ->
+     (match h with
+      | R_bool t_e ht ->
+	 let has_typ_e' : (typing empty e' t) = preservation s_e_e' t_e in
+	 let p : (halts e') =
+	   match (step_preserves_halting e e' s_e_e') with
+	     Conj pa pb -> pa ht in
+	 R_bool has_typ_e' p )
+	       
                             
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
 let rec steps_preserves_red e e' st_e_e' t h = 
@@ -105,7 +122,7 @@ val step_preserves_red' : e:exp -> e':exp -> step e e' -> t:typ -> typing empty 
 let rec step_preserves_red' e e' s_e_e' t ty_t h =
    match t with
   | TArr t1 t2 ->
-     match h with R_arrow t1 t2 ty_e h_e f ->
+     (match h with R_arrow t1 t2 ty_e h_e f ->
        let p : (halts e) = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pb h_e in
        let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e e''))) =
          fun e'' red_t1_e'' -> let h' : (red t2 (EApp e' e'')) = f e'' red_t1_e'' in
@@ -114,7 +131,13 @@ let rec step_preserves_red' e e' s_e_e' t ty_t h =
                                step_preserves_red' (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 ty_app h'
        in
 
-       R_arrow t1 t2 ty_t p ff
+       R_arrow t1 t2 ty_t p ff)
+  | TBool ->
+     (match h with
+      | R_bool t_e ht ->
+	 let p : (halts e) = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pb ht in
+	 R_bool ty_t p
+     )
 
 val steps_preserves_red' : e:exp -> e':exp -> steps e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)         
 let rec steps_preserves_red' e e' s_e_e' t ty_t h = admit()
@@ -175,6 +198,12 @@ let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
 
 type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
 
+(* val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} -> *)
+(*                   (u:exp -> typing empty u t2 -> ered t2 u -> *)
+(*                    Tot (red t2 u) (requires (not (is_value u))) (ensures True)) -> *)
+(*                   typing empty e (TArr t1 t2) -> *)
+(*                   ered (TArr t1 t2) e -> *)
+(*                   e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v -> Tot( red t2 (EApp e e')) *)
 (* let red_term_ap t1 t2 e f ty_e ered_e e' red_e' v h =  *)
 (*   let rec induction (h : steps e' v) (h4 : red t1 e') : (\* Tot *\) (red t2 (EApp e e')) =  *)
 (*     match h with *)
@@ -198,9 +227,10 @@ val red_exp_closed : #t:typ -> e:exp{not (is_value e)} ->
                      ered t e ->
                      Tot (red t e)
 let red_exp_closed t e ty_t f =
-  match t with
-  | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
-		  step_preserves_red' e e' h t ty_t (f e' h)
+  let ExIntro e' h = progress ty_t in
+  step_preserves_red' e e' h t ty_t (f e' h)
+
+	     
 
 val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
                typing (extend empty x t1) e t2 ->
@@ -225,23 +255,39 @@ let red_beta t1 t2 x e ty_t2 f e' red_e' =
 (*             red (TArr t1 t2) e *)
 
 
+
 (* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
 (*                            red2 g sigma -> *)
 (*                            red t e -> *)
 (*                            red2 (extend g x t) (update sigma x t) *)
   
 val main :
-      #x:var -> #e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
+      e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
       red2 g sigma ->
       typing g e t ->
       Tot (red t (subst sigma e))
-let main x e t t' g sigma red2_g ty_t =
+let rec main e t t' g sigma red2_g ty_t =
   match ty_t with
   | TyVar x ->
      let Conj h1 h2 = red2_g in
      let ExIntro s h = h1 x t in
      h
-  | _ -> magic()
+  | TyApp #g #e1 #e2 h1 h2 ->
+      (match main e1 sigma red2_g h1 with
+       | R_arrow t1 t2 ty_e ha_e f -> f (subst sigma e2) (main e2 sigma red2_g h2))
+  | TyLam #g t1 #e1 #t2 ty_t2 ->
+     let b : typing empty (subst sigma (ELam t1 e1)) (TArr t1 t2) = (red_subst g e t sigma  ty_t red2_g) in
+     R_arrow t1 t1
+             b
+             (ExIntro (subst sigma e) (Multi_refl (subst sigma e)))
+             (fun s h1 ->
+              red_beta t2 t1 0 e1
+                       ( match b with TyLam bla h4 -> h4)
+                       (fun u h2 -> admit())
+                       s
+                       h1
+             )
+      
 
 val id : sub
 let id (x : var) = EVar x
@@ -263,4 +309,4 @@ val normalization :
       typing empty e t ->
       Tot (halts e)
 
-let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)
+let normalization e t ty = subst_id e; red_halts (main e id red2_id_empty ty)
