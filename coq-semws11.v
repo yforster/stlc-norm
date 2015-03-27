@@ -472,9 +472,11 @@ Lemma R_beta : forall S T x t, type (update empty x S) t T ->
 Proof.
   intros S T x t H0 H1 s H2. generalize (R_ter S s H2). intros H. revert H2. induction H. intros H3.
   apply R_exp_closed.
-  econstructor. econstructor. assumption. apply R_typed. assumption.
-  intros H4. inv H4.
-  intros t' H4. inv H4.
+  - econstructor. 
+    + econstructor. assumption. 
+    + apply R_typed. assumption.
+  - intros H4. inv H4.
+  - intros t' H4. inv H4.
   apply H1. assumption.
   inv H8.
   apply H2. assumption. apply R_step_closed with (t := x0); assumption.
