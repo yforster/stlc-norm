@@ -209,10 +209,11 @@ val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
 let red_beta t1 t2 x e ty_t2 f e' red_e' =
   let ExIntro v steps_ev = red_halts red_e' in
   let rec induction (ter: steps e v) =
-    match ter with
-    | Multi_refl same_e' -> admit()
-    | Multi_step same_e' e'' same_v step_e'e'' mult_e''v -> 
-       red_exp_closed (EApp (ELam t1 e) e') (TyApp (TyLam t1 ty_t2) (red_typable_empty red_e')) (fun e' (step_ee': step e e') -> magic())
+    (match ter with
+     | Multi_step same_e' e'' same_v step_e'e'' mult_e''v -> 
+	red_exp_closed (EApp (ELam t1 e) e') (TyApp (TyLam t1 ty_t2) (red_typable_empty red_e')) (fun e' (step_ee': step e e') -> magic())
+     | Multi_refl same_e' -> magic()
+    )
   in
   induction steps_ev
 
