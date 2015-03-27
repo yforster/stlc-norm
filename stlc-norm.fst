@@ -39,12 +39,32 @@ let red_halts t e h = match h with R_arrow _ _ _ hh _ -> hh
 val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t) 
 let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
 
-val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
-let rec step_deterministic e e' e'' step1 step2 = 
-  match step1, step2 with
-  | SApp1 #fe1 fe2 #fe1' fstep_e1, SApp1 #se1 se2 #se1' sstep_e1 ->
-     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1
-  | _ -> admit()
+val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' == e'')
+let rec step_deterministic e e' e'' step1 step2 =
+  match step1 with
+  | SApp1 #fe1 fe2 #fe1' fstep_e1 -> 
+     (match step2 with
+      | SApp1 #se1 se2 #se1' sstep_e1 ->
+	 assert(fe1 == se1);
+	 step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1; 
+	 step_deterministic se1 fe1' se1' fstep_e1 sstep_e1
+      | _ -> ()
+     )
+  | SApp2 fe1 #fe2 #fe2' fstep_e2 -> 
+     (match step2 with
+      | SApp2 se1 #se2 #se2' sstep_e2 -> 
+	 assert(fe2 == se2);
+	 step_deterministic fe2 fe2' se2' fstep_e2 sstep_e2; 
+	 step_deterministic se2 fe2' se2' fstep_e2 sstep_e2
+      | SApp1 #se1 se2 #se1' sstep_e1 -> ()
+      | _ -> ()
+     )
+  | SBeta argT body arg ->
+     (match step2 with
+      | SApp2 se1 #se2 #se2' sstep_e2 -> ()
+      | SApp1 #fe1 fe2 #fe1' fstep_e -> ()
+      | SBeta argT' body' arg' -> ()
+     )
 									    
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))           
