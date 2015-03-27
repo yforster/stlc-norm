@@ -30,7 +30,7 @@ type red : typ -> exp -> Type =
            red (TPair t1 t2) e
  *)                
                 
-val value_normal : v:exp{is_value v} -> halts v
+val value_normal : v:exp{is_value v} -> Tot (halts v)
 let value_normal v = match v with ELam _ _ -> ExIntro v (Multi_refl v)
                 
 val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
@@ -142,7 +142,7 @@ let rec substitution_lemma g g' e t sigma ty_g h2 =
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
                 typing g e t ->
                 red2 g sigma ->
-                typing empty (subst sigma e) t
+                Tot (typing empty (subst sigma e) t)
 let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                         (fun x t ->
                                          let Conj r1 r2 = r in
@@ -177,7 +177,7 @@ type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
 val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
                      typing empty e t ->
                      ered t e ->
-                     red t e
+                     Tot (red t e)
 let red_exp_closed t e ty_t f =
   match t with
   | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
@@ -205,7 +205,7 @@ val main :
       #x:var -> #e:exp -> #t:typ -> #t':typ -> #v:exp -> #g:env -> sigma:sub ->
       red2 g sigma ->
       typing g e t ->
-      red t (subst sigma e)
+      Tot (red t (subst sigma e))
 let main = admit()          
 
 val id : sub
@@ -220,6 +220,6 @@ let red2_id_empty = admit()
 val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
-      halts e
+      Tot (halts e)
 
 let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)
