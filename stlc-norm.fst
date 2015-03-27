@@ -16,7 +16,7 @@ F* should have similar problems as soon as we start checking
 for negative occurrences. Hopefully by then we will also have
 a solution for this. *)
 type red : typ -> exp -> Type =
-(* | R_bool : e:exp -> typing empty e TBool -> halts e -> red TBool e *)
+| R_bool :  #e:exp -> typing empty e TBool -> halts e -> red TBool e
 | R_arrow : t1:typ -> t2:typ -> #e:exp ->
             typing empty e (TArr t1 t2) ->
             halts e ->
@@ -34,10 +34,16 @@ val value_normal : v:exp{is_value v} -> Tot (halts v)
 let value_normal v = match v with ELam _ _ -> ExIntro v (Multi_refl v)
                 
 val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
-let red_halts t e h = match h with R_arrow _ _ _ hh _ -> hh
+let red_halts t e h =
+  match h with
+  | R_arrow _ _ _ hh _ -> hh
+  | R_bool _ hh -> hh
                                                            
 val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
-let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
+let red_typable_empty t e h =
+  match h with
+  | R_arrow k1 k2 ht k3 k4 -> ht
+  | R_bool t_e ht -> t_e
 
 val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
 let rec step_deterministic e e' e'' step1 step2 = admit()
@@ -57,18 +63,29 @@ let rec step_preserves_halting e e' s_e_e' =
   in                                          
     Conj p1 p2
 
-val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e -> Tot (red t e') (decreases t)
+val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e ->
+				     Tot (red t e') (decreases t)
 let rec step_preserves_red e e' s_e_e' t h =
   match t with
   | TArr t1 t2 ->
-     match h with R_arrow t1 t2 ty_e h_e f ->
-       let has_typ_e' : (typing empty e' t) = preservation s_e_e' ty_e in
-       let p : (halts e') = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pa h_e in
-       let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e' e''))) =
-         fun e'' red_t1_e'' -> let h' : (red t2 (EApp e e'')) = f e'' red_t1_e'' in
-                               step_preserves_red (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 h'  in
-
-       R_arrow t1 t2 has_typ_e' p ff
+     (match h with
+      | R_bool t_e ht -> R_bool t_e (red_halts h) 
+      | R_arrow t1 t2 ty_e h_e f ->
+	let has_typ_e' : (typing empty e' t) = preservation s_e_e' ty_e in
+	let p : (halts e') = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pa h_e in
+	let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e' e''))) =
+          fun e'' red_t1_e'' -> let h' : (red t2 (EApp e e'')) = f e'' red_t1_e'' in
+				step_preserves_red (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 h'	in
+	R_arrow t1 t2 has_typ_e' p ff)
+  | TBool ->
+     (match h with
+      | R_bool t_e ht ->
+	 let has_typ_e' : (typing empty e' t) = preservation s_e_e' t_e in
+	 let p : (halts e') =
+	   match (step_preserves_halting e e' s_e_e') with
+	     Conj pa pb -> pa ht in
+	 R_bool has_typ_e' p )
+	       
                             
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
 let rec steps_preserves_red e e' st_e_e' t h = 
@@ -81,7 +98,7 @@ val step_preserves_red' : e:exp -> e':exp -> step e e' -> t:typ -> typing empty 
 let rec step_preserves_red' e e' s_e_e' t ty_t h =
    match t with
   | TArr t1 t2 ->
-     match h with R_arrow t1 t2 ty_e h_e f ->
+     (match h with R_arrow t1 t2 ty_e h_e f ->
        let p : (halts e) = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pb h_e in
        let ff : (e'':exp -> red t1 e'' -> Tot (red t2 (EApp e e''))) =
          fun e'' red_t1_e'' -> let h' : (red t2 (EApp e' e'')) = f e'' red_t1_e'' in
@@ -90,7 +107,13 @@ let rec step_preserves_red' e e' s_e_e' t ty_t h =
                                step_preserves_red' (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 ty_app h'
        in
 
-       R_arrow t1 t2 ty_t p ff
+       R_arrow t1 t2 ty_t p ff)
+  | TBool ->
+     (match h with
+      | R_bool t_e ht ->
+	 let p : (halts e) = match (step_preserves_halting e e' s_e_e') with Conj pa pb -> pb ht in
+	 R_bool ty_t p
+     )
 
 val steps_preserves_red' : e:exp -> e':exp -> steps e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)         
 let rec steps_preserves_red' e e' s_e_e' t ty_t h = admit()
@@ -179,9 +202,10 @@ val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
                      ered t e ->
                      Tot (red t e)
 let red_exp_closed t e ty_t f =
-  match t with
-  | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
-		  step_preserves_red' e e' h t ty_t (f e' h)
+  let ExIntro e' h = progress ty_t in
+  step_preserves_red' e e' h t ty_t (f e' h)
+
+	     
 
 (* val red_beta : t1:typ -> t2:typ -> x:var -> e:exp -> *)
 (*                typing (extend empty x t1) e t2 -> *)
