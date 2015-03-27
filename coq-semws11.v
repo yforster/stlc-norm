@@ -437,17 +437,18 @@ Proof.
   intros S T t H0 H1 H2 H3 s H4. generalize (R_ter S s H4). intros H. revert H4.
   unfold ter in H. 
   induction H as [s H IH].
-intros H4. apply H0.
-econstructor. eassumption. apply R_typed. assumption.
-intros H5. inv H5.
+  intros H4. apply H0.
+  - econstructor. eassumption. apply R_typed. assumption.
+  - intros H5. inv H5.
+  - 
 
-intros u H5. inv H5.
-destruct H2. constructor.
-destruct (H3 t1' H9) as [H3a [H3b H3c]].
-apply H3c. assumption.
+  intros u H5. inv H5.
+  destruct H2. constructor.
+  destruct (H3 t1' H9) as [H3a [H3b H3c]].
+  apply H3c. assumption.
 
-apply (IH t2' H9).
-eapply R_step_closed. eassumption. assumption.
+  apply (IH t2' H9).
+  eapply R_step_closed. eassumption. assumption.
 Qed.
 
 Lemma R_exp_closed : forall T t, type empty t T ->

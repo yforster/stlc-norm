@@ -36,15 +36,11 @@ let value_normal v = match v with ELam _ _ -> ExIntro v (Multi_refl v)
 val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
 let red_halts t e h = match h with R_arrow _ _ _ hh _ -> hh
                                                            
-val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t) 
+val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
 let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
 
 val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
-let rec step_deterministic e e' e'' step1 step2 = 
-  match step1, step2 with
-  | SApp1 #fe1 fe2 #fe1' fstep_e1, SApp1 #se1 se2 #se1' sstep_e1 ->
-     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1
-  | _ -> admit()
+let rec step_deterministic e e' e'' step1 step2 = admit()
 									    
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))           
@@ -153,19 +149,30 @@ let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                          let ExIntro s h1 = r1 x t in
                                          ExIntro s (red_typable_empty h1))
 
-type ered (t : typ) (e : exp) = e':exp -> step e e' -> red t e'
+type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
 
-val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} ->
-                  (u:exp -> typing empty u t2 -> ered t2 u ->
-                   Tot (red t2 u) (requires (not (is_value u))) (ensures True)) ->
-                  typing empty e (TArr t1 t2) ->
-                  ered (TArr t1 t2) e ->
-                  e':exp -> red t1 e' -> red t2 (EApp e e')
-let red_term_ap t1 t2 e f ty_e ered e' red_e' =
-  let ExIntro v h = red_halts red_e' in
-  let rec induction (h : steps e' v) : red t2 (EApp e e') = admit()
-  in
-  induction h
+(* val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} -> *)
+(*                   (u:exp -> typing empty u t2 -> ered t2 u -> *)
+(*                    Tot (red t2 u) (requires (not (is_value u))) (ensures True)) -> *)
+(*                   typing empty e (TArr t1 t2) -> *)
+(*                   ered (TArr t1 t2) e -> *)
+(*                   e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v -> Tot( red t2 (EApp e e')) *)
+(* let red_term_ap t1 t2 e f ty_e ered_e e' red_e' v h =  *)
+(*   let rec induction (h : steps e' v) (h4 : red t1 e') : (\* Tot *\) (red t2 (EApp e e')) =  *)
+(*     match h with *)
+(*     | Multi_refl _ -> magic() *)
+(*     | Multi_step e1 e2 e3 s_e_e2 st_e2_e' -> *)
+(*        f (EApp e e') (TyApp ty_e (red_typable_empty h4)) *)
+(*          (fun u (s_u : step (EApp e e') u) ->  *)
+(*           match s_u with *)
+(*           | SApp1 e2 #e1 s_e_e1 -> *)
+(*              let hh : step e e1 = s_e_e1 in *)
+(*              (match ered_e e1 hh with *)
+(*                 R_arrow n1 n2 n3 n4 g -> g e' red_e' ) *)
+(*           | SApp2 _ _ -> magic() *)
+(*          ) *)
+(*   in *)
+(*   (\* induction h red_e' *\) magic() *)
 
 val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
                      typing empty e t ->
