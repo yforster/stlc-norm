@@ -230,10 +230,11 @@ let red_exp_closed t e ty_t f =
   let ExIntro e' h = progress ty_t in
   step_preserves_red' e e' h t ty_t (f e' h)
 
+
 val red_beta_induction : t1:typ -> t2:typ -> x:var -> e:exp ->
                typing (extend empty 0 t1) e t2 ->
                (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta_gen x e' e))) ->
-	       e':exp -> red t1 e' -> v:exp -> steps e' v ->
+	       e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v ->
 	       Tot (red t2 (EApp (ELam t1 e) e'))
 let rec red_beta_induction t1 t2 x e ty_t2 f e' red_e' v steps_e'v =
   match steps_e'v with
@@ -247,10 +248,10 @@ let rec red_beta_induction t1 t2 x e ty_t2 f e' red_e' v steps_e'v =
 	   assert(multi exp step e'' v == steps e'' v);
 	   red_beta_induction t1 t2 x e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (magic())(*mult_e''v*) 
 	| SBeta same_t1 same_e same_e' -> f e' red_e'
-	| _ -> magic()
+	| _ -> magic() (* the two cases above are exhaustive... *)
       )
      )
-  | Multi_refl same_e' -> magic()
+  | Multi_refl same_e' -> step_preserves_red' (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
 				  
 (* ered t2 (EApp (ELam t1 e) e') 
   (fun e2 (step_e1e2: step e e') : red t2 e' -> magic()) *)
