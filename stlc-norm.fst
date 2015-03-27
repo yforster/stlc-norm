@@ -137,7 +137,7 @@ let rec substitution_lemma g g' e t sigma ty_g h2 =
   substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
                                                       ExIntro s h -> let (u:unit{g x == Some t}) = admit() in
                                                                      typing_extensional h g'')
-                                    (fun x t -> match h2 x t with ExIntro s h -> ())                      
+                      (fun x t -> match h2 x t with ExIntro s h -> ())                      
                       
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
                 typing g e t ->
@@ -181,8 +181,7 @@ val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
 let red_exp_closed t e ty_t f =
   match t with
   | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
-                  R_arrow t1 t2 ty_t (red_halts (step_preserves_red' e e' h t ty_t (f e' h)))
-                          (fun e' r_e' -> magic())
+		  step_preserves_red' e e' h t ty_t (f e' h)
 
 (* val red_beta : t1:typ -> t2:typ -> x:var -> e:exp -> *)
 (*                typing (extend empty x t1) e t2 -> *)
@@ -215,8 +214,16 @@ val subst_id : e:exp -> Lemma (subst id e = e)
 let rec subst_id e = using_induction_hyp subst_id
 
 val red2_id_empty : red2 empty id
-let red2_id_empty = admit()                         
-          
+let red2_id_empty = magic()
+
+(* type red2 (g:env) (sigma:sub) = *)
+(*     cand (x : var -> t : typ -> 
+             Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e}))) *)
+(*          (x : var -> e : exp -> 
+             Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t}))) *)
+
+			 
+			 
 val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
