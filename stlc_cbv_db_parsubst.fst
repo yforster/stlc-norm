@@ -25,6 +25,7 @@ open FunctionalExtensionality
 
 type typ =
   | TArr : typ -> typ -> typ
+  | TBool : typ
 
 type var = nat
 
