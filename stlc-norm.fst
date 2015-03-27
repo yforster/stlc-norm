@@ -181,7 +181,11 @@ val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} ->
                   typing empty e (TArr t1 t2) ->
                   ered (TArr t1 t2) e ->
                   e':exp -> red t1 e' -> red t2 (EApp e e')
-let red_term_ap = admit()                  
+let red_term_ap t1 t2 e f ty_e ered e' red_e' =
+  let ExIntro v h = red_halts red_e' in
+  let rec induction (h : steps e' v) : red t2 (EApp e e') = admit()
+  in
+  induction h
 
 val red_exp_closed : #t:typ -> #e:exp{not (is_value e)} ->
                      typing empty e t ->
@@ -193,17 +197,17 @@ let red_exp_closed t e ty_t f =
                   R_arrow t1 t2 ty_t (red_halts (step_preserves_red' e e' h t ty_t (f e' h)))
                           (fun e' r_e' -> magic())
 
-val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
-               typing (extend empty x t1) e t2 ->
-               (e' : exp -> red t1 e' -> Tot ( red t2 (subst_beta_gen x e' e))) ->
-               e' : exp -> red t1 e' -> red t2 (EApp (ELam t1 e) e')
-let red_beta t1 t2 x e ty_t2 f e' red_e =
-  let ExIntro v h = red_halts red_e in
-  let rec induction ter =
-  match h with
-  | Multi_refl _ -> admit()
-  | Multi_step _ e'' _ s_e'_e'' _ -> admit() in
-  admit()
+(* val red_beta : t1:typ -> t2:typ -> x:var -> e:exp -> *)
+(*                typing (extend empty x t1) e t2 -> *)
+(*                (e' : exp -> red t1 e' -> Tot ( red t2 (subst_beta_gen x e' e))) -> *)
+(*                e' : exp -> red t1 e' -> red t2 (EApp (ELam t1 e) e') *)
+(* let red_beta t1 t2 x e ty_t2 f e' red_e = *)
+(*   let ExIntro v h = red_halts red_e in *)
+(*   let rec induction ter = *)
+(*   match h with *)
+(*   | Multi_refl _ -> admit() *)
+(*   | Multi_step _ e'' _ s_e'_e'' _ -> admit() in *)
+(*   admit() *)
                      
 (* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
 (*                            red2 g sigma -> *)
