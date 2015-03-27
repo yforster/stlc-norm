@@ -46,7 +46,31 @@ let red_typable_empty t e h =
   | R_bool t_e ht -> t_e
 
 val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
-let rec step_deterministic e e' e'' step1 step2 = admit()
+let rec step_deterministic e e' e'' step1 step2 =
+  match step1 with
+  | SApp1 #fe1 fe2 #fe1' fstep_e1 -> 
+     (match step2 with
+      | SApp1 #se1 se2 #se1' sstep_e1 ->
+	     assert(fe1 == se1);
+	     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1; 
+	     step_deterministic se1 fe1' se1' fstep_e1 sstep_e1
+      | _ -> ()
+     )
+  | SApp2 fe1 #fe2 #fe2' fstep_e2 -> 
+     (match step2 with
+      | SApp2 se1 #se2 #se2' sstep_e2 -> 
+	     assert(fe2 == se2);
+	     step_deterministic fe2 fe2' se2' fstep_e2 sstep_e2; 
+	     step_deterministic se2 fe2' se2' fstep_e2 sstep_e2
+      | SApp1 #se1 se2 #se1' sstep_e1 -> ()
+      | _ -> ()
+     )
+  | SBeta argT body arg ->
+     (match step2 with
+      | SApp2 se1 #se2 #se2' sstep_e2 -> ()
+      | SApp1 #fe1 fe2 #fe1' fstep_e -> ()
+      | SBeta argT' body' arg' -> ()
+     )
 									    
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))           
@@ -225,11 +249,17 @@ let red_exp_closed t e ty_t f =
 (*                            red2 (extend g x t) (update sigma x t) *)
   
 val main :
-      #x:var -> #e:exp -> #t:typ -> #t':typ -> #v:exp -> #g:env -> sigma:sub ->
+      #x:var -> #e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
       red2 g sigma ->
       typing g e t ->
       Tot (red t (subst sigma e))
-let main = admit()          
+let main x e t t' g sigma red2_g ty_t =
+  match ty_t with
+  | TyVar x ->
+     let Conj h1 h2 = red2_g in
+     let ExIntro s h = h1 x t in
+     h
+  | _ -> magic()
 
 val id : sub
 let id (x : var) = EVar x
@@ -245,8 +275,6 @@ let red2_id_empty = magic()
              Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e}))) *)
 (*          (x : var -> e : exp -> 
              Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t}))) *)
-
-			 
 			 
 val normalization :
       #e:exp -> #t:typ ->
