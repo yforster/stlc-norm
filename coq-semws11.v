@@ -485,19 +485,19 @@ Lemma Basic_lemma : forall Gamma t T theta,
 Proof.
   intros Gamma t T theta H. revert theta. induction H; intros.
   - apply H0 in H. destruct H. destruct H. simpl. rewrite H. assumption.
-  - assert (B:type empty (simsubst theta (tmL x S t)) (tyA S T)).
-    apply R_substitution_lemma with (Gamma := Gamma). constructor. assumption. assumption.
-    split.
-    exact B.
-    split.
-    constructor. intros t' H'. inv H'.
-    intros s H1.
-    apply R_beta; fold simsubst.
-    inv B. exact H4.
-    intros u H2. rewrite subst_simsubst. apply IHtype.
-    apply R_preserving_context_update; assumption.
-    apply R_implies_closed' with (Gamma := Gamma). assumption.
-    assumption.
+  - assert (B:type empty (simsubst theta (tmL x S t)) (tyA S T)). {
+      apply R_substitution_lemma with (Gamma := Gamma). constructor. assumption. assumption.
+    }
+    do 2 (try split).
+    + exact B.
+    + constructor. intros t' H'. inv H'.
+    + intros s H1.
+      apply R_beta; fold simsubst.
+      * inv B. exact H4.
+      * intros u H2. rewrite subst_simsubst. apply IHtype.
+        apply R_preserving_context_update; assumption.
+        apply R_implies_closed' with (Gamma := Gamma). assumption.
+      * assumption.
   - simpl. generalize (IHtype1 theta H1); intros IH1. generalize (IHtype2 theta H1); intros IH2.
     destruct IH1 as [_ [_ IH1a]]. fold R in IH1a. apply IH1a. assumption.
 Qed.

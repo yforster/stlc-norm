@@ -207,10 +207,10 @@ let red_exp_closed t e ty_t f =
   | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
 		  step_preserves_red' e e' h t ty_t (f e' h)
 
-(* val red_beta : t1:typ -> t2:typ -> x:var -> e:exp -> *)
-(*                typing (extend empty x t1) e t2 -> *)
-(*                (e' : exp -> red t1 e' -> Tot ( red t2 (subst_beta_gen x e' e))) -> *)
-(*                e' : exp -> red t1 e' -> red t2 (EApp (ELam t1 e) e') *)
+assume val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
+               typing (extend empty x t1) e t2 ->
+               (e' : exp -> red t1 e' -> Tot ( red t2 (subst_beta_gen x e' e))) ->
+               e' : exp -> red t1 e' -> Tot (red t2 (EApp (ELam t1 e) e'))
 (* let red_beta t1 t2 x e ty_t2 f e' red_e = *)
 (*   let ExIntro v h = red_halts red_e in *)
 (*   let rec induction ter = *)
@@ -225,17 +225,32 @@ let red_exp_closed t e ty_t f =
 (*                            red2 (extend g x t) (update sigma x t) *)
   
 val main :
-      #x:var -> #e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
+      e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
       red2 g sigma ->
       typing g e t ->
       Tot (red t (subst sigma e))
-let main x e t t' g sigma red2_g ty_t =
+let rec main e t t' g sigma red2_g ty_t =
   match ty_t with
   | TyVar x ->
      let Conj h1 h2 = red2_g in
      let ExIntro s h = h1 x t in
      h
-  | _ -> magic()
+  | TyApp #g #e1 #e2 h1 h2 ->
+      (match main e1 sigma red2_g h1 with
+       | R_arrow t1 t2 ty_e ha_e f -> f (subst sigma e2) (main e2 sigma red2_g h2))
+  | TyLam #g t1 #e1 #t2 ty_t2 ->
+     let b : typing empty (subst sigma (ELam t1 e1)) (TArr t1 t2) = (red_subst g e t sigma  ty_t red2_g) in
+     R_arrow t1 t1
+             b
+             (ExIntro (subst sigma e) (Multi_refl (subst sigma e)))
+             (fun s h1 ->
+              red_beta t2 t1 0 e1
+                       ( match b with TyLam bla h4 -> h4)
+                       (fun u h2 -> admit())
+                       s
+                       h1
+             )
+      
 
 val id : sub
 let id (x : var) = EVar x
@@ -257,4 +272,4 @@ val normalization :
       typing empty e t ->
       Tot (halts e)
 
-let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)
+let normalization e t ty = subst_id e; red_halts (main e id red2_id_empty ty)
