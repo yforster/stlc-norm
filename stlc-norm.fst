@@ -30,32 +30,32 @@ type red : typ -> exp -> Type =
            red (TPair t1 t2) e
  *)                
                 
-val value_normal : v:exp{is_value v} -> halts v
+val value_normal : v:exp{is_value v} -> Tot (halts v)
 let value_normal v = match v with ELam _ _ -> ExIntro v (Multi_refl v)
                 
 val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
 let red_halts t e h = match h with R_arrow _ _ _ hh _ -> hh
                                                            
-val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t) 
+val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
 let red_typable_empty t e h = match h with | R_arrow k1 k2 ht k3 k4 -> ht
 
-val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' == e'')
+val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
 let rec step_deterministic e e' e'' step1 step2 =
   match step1 with
   | SApp1 #fe1 fe2 #fe1' fstep_e1 -> 
      (match step2 with
       | SApp1 #se1 se2 #se1' sstep_e1 ->
-	 assert(fe1 == se1);
-	 step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1; 
-	 step_deterministic se1 fe1' se1' fstep_e1 sstep_e1
+	     assert(fe1 == se1);
+	     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1; 
+	     step_deterministic se1 fe1' se1' fstep_e1 sstep_e1
       | _ -> ()
      )
   | SApp2 fe1 #fe2 #fe2' fstep_e2 -> 
      (match step2 with
       | SApp2 se1 #se2 #se2' sstep_e2 -> 
-	 assert(fe2 == se2);
-	 step_deterministic fe2 fe2' se2' fstep_e2 sstep_e2; 
-	 step_deterministic se2 fe2' se2' fstep_e2 sstep_e2
+	     assert(fe2 == se2);
+	     step_deterministic fe2 fe2' se2' fstep_e2 sstep_e2; 
+	     step_deterministic se2 fe2' se2' fstep_e2 sstep_e2
       | SApp1 #se1 se2 #se1' sstep_e1 -> ()
       | _ -> ()
      )
@@ -161,37 +161,46 @@ let rec substitution_lemma g g' e t sigma ty_g h2 =
   substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
                                                       ExIntro s h -> let (u:unit{g x == Some t}) = admit() in
                                                                      typing_extensional h g'')
-                                    (fun x t -> match h2 x t with ExIntro s h -> ())                      
+                      (fun x t -> match h2 x t with ExIntro s h -> ())                      
                       
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
                 typing g e t ->
                 red2 g sigma ->
-                typing empty (subst sigma e) t
+                Tot (typing empty (subst sigma e) t)
 let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                         (fun x t ->
                                          let Conj r1 r2 = r in
                                          let ExIntro s h1 = r1 x t in
                                          ExIntro s (red_typable_empty h1))
 
-type ered (t : typ) (e : exp) = e':exp -> step e e' -> red t e'
+type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
 
-(* val red_term_ap : t1:typ -> t2:typ -> e:exp{not (is_value e)} -> *)
-(*                   (u:exp -> typing empty u t2 -> ered t2 u -> *)
-(*                    Tot (red t2 u) (requires (not (is_value u))) (ensures True)) -> *)
-(*                   typing empty e (TArr t1 t2) -> *)
-(*                   ered (TArr t1 t2) e -> *)
-(*                   e':exp -> red t1 e' -> red t2 (EApp e e') *)
-(* let red_term_ap t1 t2 e f ty_e ered e' red_e' = *)
-(*   let ExIntro v h = red_halts red_e' in *)
-(*   let rec induction (h : steps e' v) : red t2 (EApp e e') = admit() *)
+(* let red_term_ap t1 t2 e f ty_e ered_e e' red_e' v h =  *)
+(*   let rec induction (h : steps e' v) (h4 : red t1 e') : (\* Tot *\) (red t2 (EApp e e')) =  *)
+(*     match h with *)
+(*     | Multi_refl _ -> magic() *)
+(*     | Multi_step e1 e2 e3 s_e_e2 st_e2_e' -> *)
+(*        f (EApp e e') (TyApp ty_e (red_typable_empty h4)) *)
+(*          (fun u (s_u : step (EApp e e') u) ->  *)
+(*           match s_u with *)
+(*           | SApp1 e2 #e1 s_e_e1 -> *)
+(*              let hh : step e e1 = s_e_e1 in *)
+(*              (match ered_e e1 hh with *)
+(*                 R_arrow n1 n2 n3 n4 g -> g e' red_e' ) *)
+(*           | SApp2 _ _ -> magic() *)
+(*          ) *)
 (*   in *)
-(*   induction h *)
+(*   (\* induction h red_e' *\) magic() *)
+
 
 val red_exp_closed : #t:typ -> e:exp{not (is_value e)} ->
                      typing empty e t ->
                      ered t e ->
                      Tot (red t e)
-let red_exp_closed = magic()
+let red_exp_closed t e ty_t f =
+  match t with
+  | TArr t1 t2 -> let ExIntro e' h = progress ty_t in
+		  step_preserves_red' e e' h t ty_t (f e' h)
 
 val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
                typing (extend empty x t1) e t2 ->
@@ -214,18 +223,24 @@ let red_beta t1 t2 x e ty_t2 f e' red_e' =
 (*             (e':exp -> red t1 e' -> Tot (red t2 (EApp e e'))) -> *)
 (*             red (TArr t1 t2) e *)
 
-                     
+
 (* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
 (*                            red2 g sigma -> *)
 (*                            red t e -> *)
 (*                            red2 (extend g x t) (update sigma x t) *)
   
 val main :
-      #x:var -> #e:exp -> #t:typ -> #t':typ -> #v:exp -> #g:env -> sigma:sub ->
+      #x:var -> #e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
       red2 g sigma ->
       typing g e t ->
-      red t (subst sigma e)
-let main = admit()          
+      Tot (red t (subst sigma e))
+let main x e t t' g sigma red2_g ty_t =
+  match ty_t with
+  | TyVar x ->
+     let Conj h1 h2 = red2_g in
+     let ExIntro s h = h1 x t in
+     h
+  | _ -> magic()
 
 val id : sub
 let id (x : var) = EVar x
@@ -234,11 +249,17 @@ val subst_id : e:exp -> Lemma (subst id e = e)
 let rec subst_id e = using_induction_hyp subst_id
 
 val red2_id_empty : red2 empty id
-let red2_id_empty = admit()                         
-          
+let red2_id_empty = magic()
+
+(* type red2 (g:env) (sigma:sub) = *)
+(*     cand (x : var -> t : typ -> 
+             Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e}))) *)
+(*          (x : var -> e : exp -> 
+             Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t}))) *)
+			 
 val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
-      halts e
+      Tot (halts e)
 
 let normalization e t ty = subst_id e; red_halts (main id red2_id_empty ty)
