@@ -315,6 +315,8 @@ let id (x : var) = EVar x
 val subst_id : e:exp -> Lemma (subst id e = e)
 let rec subst_id e = using_induction_hyp subst_id
 
+assume val exfalso_quodlibet : unit -> Tot 'a (requires (False)) (ensures True)
+                                         
 val red2_id_empty : red2 empty id
 let red2_id_empty = magic()
 
