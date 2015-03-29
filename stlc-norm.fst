@@ -2,6 +2,7 @@ module StlcNormalizing
 
 open StlcCbvDbParSubst
 open Constructive
+open FunctionalExtensionality
        
 kind Relation (a:Type) = a -> a -> Type
 type multi (a:Type) (r:Relation a) : a -> a -> Type =
@@ -172,16 +173,18 @@ let rec substitution_lemma' g g' e t sigma ty_g h1 h2 =
   | TyLam #g t1 #e1 #t2 ih1 ->
      TyLam t1 (substitution_lemma' (extend g' 0 t1) (subst_elam sigma) ih1 (magic()) (fun x t -> admit()))
 
-val invariance_env : #e:exp -> #t:typ -> g:env -> g':env -> typing g e t -> Tot (typing g' e t) (requires (forall x. is_Some (g x) ==> g x == g' x)) (ensures True)
-let rec invariance_env e t g g' ty_g =
-  match ty_g with
-  | TyApp ty_arrow ty_arg -> TyApp (invariance_env g g' ty_arrow) (invariance_env g g' ty_arg)
-  | TyLam argT ty_ext -> TyLam argT (invariance_env (extend g 0 argT) (extend g' 0 argT) ty_ext)
-  | TyVar #g x -> assert(e == EVar x); assert(t == Some.v (g' x)); TyVar #g' x 
+assume val empty_no_free : #e:exp -> #t:typ -> typing empty e t -> Lemma(forall x. not(appears_free_in x e))
 
 val invariance_empty : #e:exp -> #t:typ ->
   typing empty e t -> g:env -> Tot ( typing g e t )
-let invariance_empty e t ty g = invariance_env #e #t empty g ty
+let rec invariance_empty e t ty g = 
+  match ty with
+  | TyApp ty_arrow ty_arg -> TyApp (invariance_empty ty_arrow g) (invariance_empty ty_arg g)
+  | TyLam #empty argT #body #resT ty_ext -> 
+     empty_no_free ty;
+     assert(EnvEqualE e empty g);
+     assert(EnvEqualE body (extend empty 0 argT) (extend g 0 argT));
+     TyLam argT (context_invariance ty_ext (extend g 0 argT))
 
 
 (*
@@ -210,9 +213,10 @@ val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                          (x:var -> t:typ -> Tot (cexists (fun e -> h:(typing empty e t){g x == Some t ==> sigma x == e}))) ->
                          Tot (typing g' (subst sigma e) t)
 let rec substitution_lemma g g' e t sigma ty_g h2 =                             
-  substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
-                                                      ExIntro s h -> let (u:unit{g x == Some t}) = magic() in
-                                                                     invariance_empty h g'')
+  substitution_lemma' g' sigma ty_g 
+		      (fun x t g'' -> match h2 x t with
+                                      | ExIntro s h -> let (u:unit{g x == Some t}) = magic() in
+                                                       invariance_empty h g'')
                       (fun x t -> match h2 x t with ExIntro s h -> ())                      
                       
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
