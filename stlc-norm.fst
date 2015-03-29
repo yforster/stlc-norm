@@ -278,7 +278,16 @@ let red_beta t1 t2 e ty_t2 f e' red_e' =
 (*                            red2 g sigma -> *)
 (*                            red t e -> *)
 (*                            red2 (extend g x t) (update sigma x t) *)
-  
+
+val update : sub -> var -> exp -> Tot sub                        
+let update s x v y = if y = x then v else s y
+
+                                            
+                        
+val subst_update : x:var -> v:exp -> e:exp -> sigma:sub ->
+                   Lemma (subst_beta v (subst (subst_elam sigma) e) = subst (update (subst_elam sigma) 0 v) e)
+let subst_update = admit()
+                        
 val main :
       e:exp -> #t:typ -> #t':typ -> #g:env -> sigma:sub ->
       red2 g sigma ->
@@ -301,11 +310,16 @@ let rec main e t t' g sigma red2_g ty_t =
        (fun s h1 ->
         assert (e == ELam t1 e1);
         assert (subst sigma e == ELam t1 (subst (subst_elam sigma) e1));
-        let p : (typing (extend empty 0 t1) (subst (subst_elam sigma) e1) t2) = (match b with TyLam bla h4 -> h4) in
-        (* let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta_gen 0 u s))) = magic() in *)
-        red_beta t1 t2 e1' p (magic()) s h1
+        let p : (typing (extend empty 0 t1) (e1') t2) = (match b with TyLam bla h4 -> h4) in
+        let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta u e1'))) = fun u red_u ->
+          subst_update 0 u e1 sigma;
+          assert (subst_beta u e1' = subst (update (subst_elam sigma) 0 u) e1);
+          main e1 (update (subst_elam sigma) 0 u) (magic()) (magic())
+          magic()
+        in
+        red_beta t1 t2 e1' p f s h1
        ) in
-       R_arrow t1 t2 #(subst sigma e) b ex f
+       R_arrow t1 t2 #(subst sigma e) b ex (f)
 
       
 
