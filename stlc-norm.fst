@@ -170,20 +170,20 @@ let rec substitution_lemma' g g' e t sigma ty_g h1 h2 =
   | TyVar x -> if sigma x <> EVar x then h1 x t g' else (h2 x t; TyVar x)
   | TyApp #g_ #e1 #e2 ih1 ih2 -> TyApp (substitution_lemma' g' sigma ih1 h1 (fun x t -> h2 x t)) (substitution_lemma' g' sigma ih2 h1 (fun x t -> h2 x t))
   | TyLam #g t1 #e1 #t2 ih1 ->
-     let subst_elam : y:var -> Tot (e:exp{renaming sigma ==> is_EVar e}) =
-       fun y -> if y=0 then EVar y
-                else subst sub_inc (sigma (y-1)) in
-     let (u:unit{ (subst sigma (ELam t1 e1) == ELam t1 (subst subst_elam e1)) }) = admit() in
-     TyLam t1 (substitution_lemma' (extend g' 0 t1) subst_elam ih1 (h1) h2)
+     TyLam t1 (substitution_lemma' (extend g' 0 t1) (subst_elam sigma) ih1 (magic()) (fun x t -> admit()))
 
+val invariance_empty : #e:exp -> #t:typ ->
+  typing empty e t -> g:env -> Tot ( typing g e t )
+let invariance_empty e t ty g = magic()
+                                   
 val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                          typing g e t ->
                          (x:var -> t:typ -> Tot (cexists (fun e -> h:(typing empty e t){g x == Some t ==> sigma x == e}))) ->
                          Tot (typing g' (subst sigma e) t)
 let rec substitution_lemma g g' e t sigma ty_g h2 =                             
   substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
-                                                      ExIntro s h -> let (u:unit{g x == Some t}) = admit() in
-                                                                     typing_extensional h g'')
+                                                      ExIntro s h -> let (u:unit{g x == Some t}) = magic() in
+                                                                     invariance_empty h g'')
                       (fun x t -> match h2 x t with ExIntro s h -> ())                      
                       
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
@@ -232,19 +232,19 @@ let red_exp_closed t e ty_t f =
 
 	     
 
-val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
+assume val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
                typing (extend empty x t1) e t2 ->
                (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta_gen x e' e))) ->
                e' : exp -> red t1 e' -> Tot (red t2 (EApp (ELam t1 e) e'))
-let red_beta t1 t2 x e ty_t2 f e' red_e' =
-  let ExIntro v steps_ev = red_halts red_e' in
-  let rec induction (ter: steps e v) =
-    match ter with
-    | Multi_refl same_e' -> admit()
-    | Multi_step same_e' e'' same_v step_e'e'' mult_e''v -> 
-       red_exp_closed (EApp (ELam t1 e) e') (TyApp (TyLam t1 ty_t2) (red_typable_empty red_e')) (fun e' (step_ee': step e e') -> magic())
-  in
-  induction steps_ev
+(* let red_beta t1 t2 x e ty_t2 f e' red_e' = *)
+(*   let ExIntro v steps_ev = red_halts red_e' in *)
+(*   let rec induction (ter: steps e v) = *)
+(*     match ter with *)
+(*     | Multi_refl same_e' -> admit() *)
+(*     | Multi_step same_e' e'' same_v step_e'e'' mult_e''v ->  *)
+(*        red_exp_closed (EApp (ELam t1 e) e') (TyApp (TyLam t1 ty_t2) (red_typable_empty red_e')) (fun e' (step_ee': step e e') -> magic()) *)
+(*   in *)
+(*   induction steps_ev *)
 
 
 (* | R_arrow : t1:typ -> t2:typ -> #e:exp -> *)
@@ -272,20 +272,22 @@ let rec main e t t' g sigma red2_g ty_t =
      let ExIntro s h = h1 x t in
      h
   | TyApp #g #e1 #e2 h1 h2 ->
-      (match main e1 sigma red2_g h1 with
-       | R_arrow t1 t2 ty_e ha_e f -> f (subst sigma e2) (main e2 sigma red2_g h2))
+     (match main e1 sigma red2_g h1 with
+      | R_arrow t1 t2 ty_e ha_e f -> f (subst sigma e2) (main e2 sigma red2_g h2))
   | TyLam #g t1 #e1 #t2 ty_t2 ->
-     let b : typing empty (subst sigma (ELam t1 e1)) (TArr t1 t2) = (red_subst g e t sigma  ty_t red2_g) in
-     R_arrow t1 t1
-             b
-             (ExIntro (subst sigma e) (Multi_refl (subst sigma e)))
-             (fun s h1 ->
-              red_beta t2 t1 0 e1
-                       ( match b with TyLam bla h4 -> h4)
-                       (fun u h2 -> admit())
-                       s
-                       h1
-             )
+     let b : typing empty (subst sigma e) (TArr t1 t2) = (red_subst g e t sigma  ty_t red2_g) in
+     let ex : halts (subst sigma e) = ExIntro (subst sigma e) (Multi_refl (subst sigma e)) in
+     let e1' = (subst (subst_elam sigma) e1) in
+     let f : (s: exp -> red t1 s -> Tot ( red t2 (EApp (ELam t1 (subst (subst_elam sigma) e1)) s) )) = 
+       (fun s h1 ->
+        let p : (typing (extend empty 0 t1) e1 t2) = (match b with TyLam bla h4 -> h4) in
+        let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta_gen 0 u s))) = magic() in
+        red_beta t1 t2 0 e1' (magic()) (magic()) s h1
+       )in
+       R_arrow t1 t2 #(subst sigma e) b ex f
+
+             
+                          
       
 
 val id : sub
