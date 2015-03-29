@@ -16,7 +16,7 @@ type closed (e : exp) = (forall y. not(appears_free_in y e))
 type closed2 (sigma:sub) = (forall x. sigma x <> EVar x ==> closed(sigma x))
 
 val closed_app : e1 : exp -> e2:exp -> Lemma (requires (closed (EApp e1 e2))) (ensures (closed e1 /\ closed e2))
-let closed_app = admit() (* intuitively trivial *)                                             
+let closed_app e1 e2 = ()                                       
                     
 val subst_closed : e:exp -> 
    Lemma (requires (closed e)) (ensures (forall sigma. subst sigma e = e))
