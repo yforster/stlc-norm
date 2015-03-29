@@ -230,21 +230,40 @@ let red_exp_closed t e ty_t f =
   let ExIntro e' h = progress ty_t in
   step_preserves_red' e e' h t ty_t (f e' h)
 
-	     
 
-assume val red_beta : t1:typ -> t2:typ -> x:var -> e:exp ->
-               typing (extend empty x t1) e t2 ->
-               (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta_gen x e' e))) ->
+
+val red_beta_induction : t1:typ -> t2:typ -> e:exp ->
+               typing (extend empty 0 t1) e t2 ->
+               (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta e' e))) ->
+	       e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v ->
+	       Tot (red t2 (EApp (ELam t1 e) e'))
+let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
+  match steps_e'v with
+  | Multi_step same_e' e'' same_v step_e'e'' mult_e''v -> 
+     red_exp_closed #t2 (EApp (ELam t1 e) e') (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) 
+     (fun exp_e (stp : step (EApp (ELam t1 e) e') exp_e) -> 
+      ( match stp with
+	| SApp2 lambda #same_e' #same_e'' stp_e' -> 
+	   step_deterministic e' e'' same_e'' step_e'e'' stp_e';
+	   assert(exp_e == (EApp (ELam t1 e) e'')); 
+	   assert(multi exp step e'' v == steps e'' v);
+	   assert(same_v == v);
+	   red_beta_induction t1 t2 e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (magic())(*mult_e''v*) 
+	| SBeta same_t1 same_e same_e' -> f e' red_e'
+	| _ -> magic() (* the two cases above are exhaustive... *)
+      )
+     )
+  | Multi_refl same_e' -> step_preserves_red' (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
+				  
+
+val red_beta : t1:typ -> t2:typ -> e:exp ->
+               typing (extend empty 0 t1) e t2 ->
+               (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta e' e))) ->
                e' : exp -> red t1 e' -> Tot (red t2 (EApp (ELam t1 e) e'))
-(* let red_beta t1 t2 x e ty_t2 f e' red_e' = *)
-(*   let ExIntro v steps_ev = red_halts red_e' in *)
-(*   let rec induction (ter: steps e v) = *)
-(*     match ter with *)
-(*     | Multi_refl same_e' -> admit() *)
-(*     | Multi_step same_e' e'' same_v step_e'e'' mult_e''v ->  *)
-(*        red_exp_closed (EApp (ELam t1 e) e') (TyApp (TyLam t1 ty_t2) (red_typable_empty red_e')) (fun e' (step_ee': step e e') -> magic()) *)
-(*   in *)
-(*   induction steps_ev *)
+let red_beta t1 t2 e ty_t2 f e' red_e' =
+  let ExIntro v steps_e'v = red_halts red_e' 
+  in red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v
+
 
 
 (* | R_arrow : t1:typ -> t2:typ -> #e:exp -> *)
@@ -278,16 +297,16 @@ let rec main e t t' g sigma red2_g ty_t =
      let b : typing empty (subst sigma e) (TArr t1 t2) = (red_subst g e t sigma  ty_t red2_g) in
      let ex : halts (subst sigma e) = ExIntro (subst sigma e) (Multi_refl (subst sigma e)) in
      let e1' = (subst (subst_elam sigma) e1) in
-     let f : (s: exp -> red t1 s -> Tot ( red t2 (EApp (ELam t1 (subst (subst_elam sigma) e1)) s) )) = 
+     let f : (s: exp -> red t1 s -> Tot ( red t2 (EApp (subst sigma e) s) )) = 
        (fun s h1 ->
-        let p : (typing (extend empty 0 t1) e1 t2) = (match b with TyLam bla h4 -> h4) in
-        let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta_gen 0 u s))) = magic() in
-        red_beta t1 t2 0 e1' (magic()) (magic()) s h1
-       )in
+        assert (e == ELam t1 e1);
+        assert (subst sigma e == ELam t1 (subst (subst_elam sigma) e1));
+        let p : (typing (extend empty 0 t1) (subst (subst_elam sigma) e1) t2) = (match b with TyLam bla h4 -> h4) in
+        (* let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta_gen 0 u s))) = magic() in *)
+        red_beta t1 t2 e1' p (magic()) s h1
+       ) in
        R_arrow t1 t2 #(subst sigma e) b ex f
 
-             
-                          
       
 
 val id : sub
