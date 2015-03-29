@@ -207,6 +207,21 @@ let rec invariance_empty e t ty g =
             typing g (EApp e1 e2) t12
 
 *)
+
+
+val substitution_lemma_empty : #g:env -> #e:exp -> #t:typ -> sigma:sub ->
+                         typing g e t ->
+                         (x:var -> t:typ -> Tot (cexists (fun e -> h:(typing empty e t){g x == Some t ==> sigma x == e}))) ->
+                         Tot (typing empty (subst sigma e) t)
+let rec substitution_lemma_empty g e t sigma ty_g h = 
+  match ty_g with
+  | TyVar x -> let ExIntro exp_x ty_exp_x = h x (Some.v (g x)) in
+	       ty_exp_x
+  | TyApp ty_fun ty_arg -> TyApp (substitution_lemma_empty sigma ty_fun h) (substitution_lemma_empty sigma ty_arg h)
+  | TyLam argT ty_ext -> TyLam argT (invariance_empty (substitution_lemma_empty (* subst_elam sigma *) sigma ty_ext (fun x xT -> magic())) (extend empty 0 argT))
+
+(* you have to do recursive call with subst_elam but then 0 maps to 0 and is not typable in empty....*)
+
                                    
 val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                          typing g e t ->
