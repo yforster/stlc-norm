@@ -177,7 +177,7 @@ let rec invariance_env e t g g' ty_g =
   match ty_g with
   | TyApp ty_arrow ty_arg -> TyApp (invariance_env g g' ty_arrow) (invariance_env g g' ty_arg)
   | TyLam argT ty_ext -> TyLam argT (invariance_env (extend g 0 argT) (extend g' 0 argT) ty_ext)
-  | TyVar #g x -> assert(e == EVar x); assert(t == Some.v (g' x)); TyVar #g' x 
+  | TyVar #g x -> magic()
 
 val invariance_empty : #e:exp -> #t:typ ->
   typing empty e t -> g:env -> Tot ( typing g e t )
@@ -293,25 +293,14 @@ let red_beta t1 t2 e ty_t2 f e' red_e' =
   let ExIntro v steps_e'v = red_halts red_e' 
   in red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v
 
-
-
-(* | R_arrow : t1:typ -> t2:typ -> #e:exp -> *)
-(*             typing empty e (TArr t1 t2) -> *)
-(*             halts e -> *)
-(*             (e':exp -> red t1 e' -> Tot (red t2 (EApp e e'))) -> *)
-(*             red (TArr t1 t2) e *)
-
-
-
-(* val red_preserves_update : g:env -> sigma:sub -> t:typ -> x:var -> e:exp -> *)
-(*                            red2 g sigma -> *)
-(*                            red t e -> *)
-(*                            red2 (extend g x t) (update sigma x t) *)
-
 val update : sub -> var -> exp -> Tot sub                        
 let update s x v y = if y = x then v else s y
 
                                             
+val red2_preserves_update :
+    #g:env -> #sigma:sub -> t:typ -> u:exp ->
+    red2 g sigma -> Tot ( red2 (extend g 0 t) (update (subst_elam sigma) 0 u) )
+let red2_preserves_update = magic()                                            
                         
 val subst_update : x:var -> v:exp -> e:exp -> sigma:sub ->
                    Lemma (subst_beta v (subst (subst_elam sigma) e) = subst (update (subst_elam sigma) 0 v) e)
@@ -343,14 +332,13 @@ let rec main e t t' g sigma red2_g ty_t =
         let f : (u:exp -> red t1 u -> Tot (red t2 (subst_beta u e1'))) = fun u red_u ->
           subst_update 0 u e1 sigma;
           assert (subst_beta u e1' = subst (update (subst_elam sigma) 0 u) e1);
-          main e1 (update (subst_elam sigma) 0 u) (magic()) (magic())
-          magic()
+          let r : (red2 (extend g 0 t1) (update (subst_elam sigma) 0 u)) = red2_preserves_update t1 u red2_g in
+          main e1 (update (subst_elam sigma) 0 u) (r) ty_t2
         in
         red_beta t1 t2 e1' p f s h1
        ) in
        R_arrow t1 t2 #(subst sigma e) b ex (f)
 
-      
 
 val id : sub
 let id (x : var) = EVar x
@@ -373,5 +361,4 @@ val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
       Tot (halts e)
-
 let normalization e t ty = subst_id e; red_halts (main e id red2_id_empty ty)
