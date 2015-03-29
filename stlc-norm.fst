@@ -172,9 +172,38 @@ let rec substitution_lemma' g g' e t sigma ty_g h1 h2 =
   | TyLam #g t1 #e1 #t2 ih1 ->
      TyLam t1 (substitution_lemma' (extend g' 0 t1) (subst_elam sigma) ih1 (magic()) (fun x t -> admit()))
 
+val invariance_env : #e:exp -> #t:typ -> g:env -> g':env -> typing g e t -> Tot (typing g' e t) (requires (forall x. is_Some (g x) ==> g x == g' x)) (ensures True)
+let rec invariance_env e t g g' ty_g =
+  match ty_g with
+  | TyApp ty_arrow ty_arg -> TyApp (invariance_env g g' ty_arrow) (invariance_env g g' ty_arg)
+  | TyLam argT ty_ext -> TyLam argT (invariance_env (extend g 0 argT) (extend g' 0 argT) ty_ext)
+  | TyVar #g x -> assert(e == EVar x); assert(t == Some.v (g' x)); TyVar #g' x 
+
 val invariance_empty : #e:exp -> #t:typ ->
   typing empty e t -> g:env -> Tot ( typing g e t )
-let invariance_empty e t ty g = magic()
+let invariance_empty e t ty g = invariance_env #e #t empty g ty
+
+
+(*
+ | TyVar : #g:env ->
+            x:var{is_Some (g x)} ->
+            typing g (EVar x) (Some.v (g x))
+  | TyLam : #g:env ->
+            t:typ ->
+            #e1:exp ->
+            #t':typ ->
+            typing (extend g 0 t) e1 t' ->
+            typing g (ELam t e1) (TArr t t')
+  | TyApp : #g:env ->
+            #e1:exp ->
+            #e2:exp ->
+            #t11:typ ->
+            #t12:typ ->
+            typing g e1 (TArr t11 t12) ->
+            typing g e2 t11 ->
+            typing g (EApp e1 e2) t12
+
+*)
                                    
 val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                          typing g e t ->
