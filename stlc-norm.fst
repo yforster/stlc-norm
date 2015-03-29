@@ -221,7 +221,7 @@ type red2 (g:env) (sigma:sub) =
     cand (x : var -> t : typ -> Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e})))
          (x : var -> e : exp -> Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t})))
 type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
-
+                                                           
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
                 typing g e t ->
                 red2 g sigma ->
