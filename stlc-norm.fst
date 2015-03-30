@@ -27,8 +27,8 @@ let rec subst_closed e =
 
 val substitution_lemma' : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                           typing g e t ->
-                          (x:var -> t:typ -> g'':env -> Tot (typing g'' (sigma x) t)
-                                                            (requires (g x == Some t /\ sigma x <> EVar x))
+                          (x:var -> t:typ{g x == Some t} -> g'':env -> Tot (typing g'' (sigma x) t)
+                                                            (requires (sigma x <> EVar x))
                                                             (ensures True)) ->
                           (x:var -> t:typ -> Lemma (requires (g x == Some t /\ sigma x == EVar x))
                                                    (ensures (g' x == Some t))) ->
@@ -53,7 +53,7 @@ let invariance_empty e t ty g = invariance_env #e #t empty g ty
                                    
 val substitution_lemma : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                          typing g e t ->
-                         (x:var -> t:typ -> Tot (cexists (fun e -> h:(typing empty e t){g x == Some t ==> sigma x == e}))) ->
+                         (x:var -> t:typ{g x == Some t} -> Tot (cexists (fun e -> h:(typing empty e t){sigma x == e}))) ->
                          Tot (typing g' (subst sigma e) t)
 let rec substitution_lemma g g' e t sigma ty_g h2 =                             
   substitution_lemma' g' sigma ty_g (fun x t g'' -> match h2 x t with
@@ -218,8 +218,8 @@ let rec step_preserves_red' e e' s_e_e' t ty_t h =
 (*** The relations red2 and ered *)                       
 
 type red2 (g:env) (sigma:sub) =
-    cand (x : var -> t : typ -> Tot (cexists (fun e -> h:(red t e){g x == Some t ==> sigma x == e})))
-         (x : var -> e : exp -> Tot (cexists (fun t -> h:(red t e){sigma x == e /\ EVar x <> e ==> g x == Some t})))
+    cand (x : var -> t : typ{g x == Some t} -> Tot (cexists (fun e -> h:(red t e){sigma x == e})))
+         (x : var -> e : exp{sigma x == e /\ EVar x <> e} -> Tot (cexists (fun t -> h:(red t e){g x == Some t})))
 type ered (t : typ) (e : exp) = e':exp -> step e e' -> Tot (red t e')
                                                            
 val red_subst : g:env -> e:exp -> t:typ -> sigma:sub ->
@@ -323,7 +323,7 @@ let rec main e t t' g sigma red2_g ty_t =
 assume val exfalso_quodlibet : unit -> Tot 'a (requires (False)) (ensures True)
                                          
 val red2_id_empty : red2 empty id
-let red2_id_empty = magic()
+let red2_id_empty = Conj (fun x e -> exfalso_quodlibet()) (fun x t -> exfalso_quodlibet())
 
 val normalization :
       #e:exp -> #t:typ ->
