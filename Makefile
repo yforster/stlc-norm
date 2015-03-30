@@ -4,6 +4,8 @@ include Makefile.include
 #FSTAR_BIN=fstar.exe
 #FSTAR_MONO=mono
 #TIMEOUT=100
+DEFTIMEOUT=50
+
 FSTAR=$(FSTAR_MONO) $(FSTAR_HOME)/bin/$(FSTAR_BIN) --n_cores 1 --max_fuel 1 --max_ifuel 1 --fstar_home $(FSTAR_HOME)
 
 all : stlc-norm
@@ -12,7 +14,7 @@ stlc-base : stlc_cbv_db_parsubst.fst
 	$(FSTAR) $(FSTAR_HOME)/lib/constr.fst $(FSTAR_HOME)/lib/classical.fst $(FSTAR_HOME)/lib/ext.fst stlc_cbv_db_parsubst.fst
 
 stlc-norm : stlc-norm.fst
-	$(FSTAR) $(FSTAR_HOME)/lib/constr.fst $(FSTAR_HOME)/lib/classical.fst $(FSTAR_HOME)/lib/ext.fst stlc_cbv_db_parsubst.fst stlc-norm.fst
+	$(FSTAR) $(FSTAR_HOME)/lib/constr.fst $(FSTAR_HOME)/lib/classical.fst $(FSTAR_HOME)/lib/ext.fst stlc_cbv_db_parsubst.fst stlc-norm.fst --z3timeout $(DEFTIMEOUT)
 
 stlc-log : stlc-norm.fst
 	$(FSTAR) $(FSTAR_HOME)/lib/constr.fst $(FSTAR_HOME)/lib/classical.fst $(FSTAR_HOME)/lib/ext.fst stlc_cbv_db_parsubst.fst stlc-norm.fst --log_types
