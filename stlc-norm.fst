@@ -16,7 +16,7 @@ type closed (e : exp) = (forall y. not(appears_free_in y e))
 type closed2 (sigma:sub) = (forall x. sigma x <> EVar x ==> closed(sigma x))
 
 val closed_app : e1 : exp -> e2:exp -> Lemma (requires (closed (EApp e1 e2))) (ensures (closed e1 /\ closed e2))
-let closed_app e1 e2 = ()                                       
+let closed_app e1 e2 = ()
                     
 val subst_closed : e:exp -> 
    Lemma (requires (closed e)) (ensures (forall sigma. subst sigma e = e))
@@ -28,8 +28,8 @@ let rec subst_closed e =
 val substitution_lemma' : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                           typing g e t ->
                           (x:var -> t:typ{g x == Some t} -> g'':env -> Tot (typing g'' (sigma x) t)
-                                                            (requires (sigma x <> EVar x))
-                                                            (ensures True)) ->
+                                                                           (requires (sigma x <> EVar x))
+                                                                           (ensures True)) ->
                           (x:var -> t:typ -> Lemma (requires (g x == Some t /\ sigma x == EVar x))
                                                    (ensures (g' x == Some t))) ->
                           Tot (typing g' (subst sigma e) t)
@@ -231,10 +231,36 @@ let red_subst g e t sigma ty_t r = substitution_lemma empty sigma ty_t
                                          let Conj r1 r2 = r in
                                          let ExIntro s h1 = r1 x t in
                                          ExIntro s (red_typable_empty h1))
+
+assume val typing_closed : #e:exp -> #t:typ -> typing empty e t -> Lemma (closed e)
+                                        
 val red2_preserves_update :
-    #g:env -> #sigma:sub -> t:typ -> u:exp ->
+    #g:env -> #sigma:sub -> t':typ -> u:exp -> red t u ->
     red2 g sigma -> Tot ( red2 (extend g 0 t) (update (subst_elam sigma) 0 u) )
-let red2_preserves_update = magic()                             
+let red2_preserves_update g sigma t' u red_u red2_g =
+  Conj (fun (x:var) t ->
+                   if x <> 0
+                   then
+                     (
+                       assert (x-1 >= 0);
+                       let Conj p1 p2 = red2_g in
+                       assert (extend g 0 t x = t);
+                       let ExIntro e red_e = p1 (x-1) t in
+                       typing_closed (red_typable_empty red_e);
+                       subst_closed e;
+                       assert (sigma(x-1) = e);
+                       assert (update (subst_elam sigma) 0 u x = subst sub_inc (sigma (x-1)));
+                       assert (subst sub_inc (sigma (x-1)) = sigma(x-1));
+                       p1 (x-1) t
+                     )
+                   else
+                     (
+                       assert (update (subst_elam sigma) 0 u 0 == u);
+                       let test : h:(red t u){update (subst_elam sigma) 0 u 0 == u} = red_u in
+                       ExIntro u test
+                     )
+       )
+       (admit())
                      
 val red_exp_closed : #t:typ -> e:exp{not (is_value e)} ->
                      typing empty e t ->
@@ -311,7 +337,7 @@ let rec main e t t' g sigma red2_g ty_t =
           red2_closed' red2_g;
           subst_update 0 u e1 sigma;
           assert (subst_beta u e1' = subst (update (subst_elam sigma) 0 u) e1);
-          let r : (red2 (extend g 0 t1) (update (subst_elam sigma) 0 u)) = red2_preserves_update t1 u red2_g in
+          let r : (red2 (extend g 0 t1) (update (subst_elam sigma) 0 u)) = red2_preserves_update t1 u red_u red2_g in
           main e1 (update (subst_elam sigma) 0 u) (r) ty_t2
         in
         red_beta t1 t2 e1' p f s h1
