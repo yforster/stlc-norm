@@ -42,14 +42,14 @@ let rec substitution_lemma' g g' e t sigma ty_g h1 h2 =
   | TyVar x -> if sigma x <> EVar x then h1 x t g' else (h2 x t; TyVar x)
   | TyApp #g_ #e1 #e2 ih1 ih2 -> TyApp (substitution_lemma' g' sigma ih1 h1 (fun x t -> h2 x t)) (substitution_lemma' g' sigma ih2 h1 (fun x t -> h2 x t))
   | TyLam #g t1 #e1 #t2 ih1 ->
-     TyLam t1 (substitution_lemma' (extend g' 0 t1) (subst_elam sigma) ih1 (magic()) (fun x t -> admit()))
+     TyLam t1 (substitution_lemma' (extend g' 0 t1) (subst_elam sigma) ih1 (ok()) (fun x t -> ok_a()))
 
 val invariance_env : #e:exp -> #t:typ -> g:env -> g':env -> typing g e t -> Tot (typing g' e t) (requires (forall x. is_Some (g x) ==> g x == g' x)) (ensures True)
 let rec invariance_env e t g g' ty_g =
   match ty_g with
   | TyApp ty_arrow ty_arg -> TyApp (invariance_env g g' ty_arrow) (invariance_env g g' ty_arg)
   | TyLam argT ty_ext -> TyLam argT (invariance_env (extend g 0 argT) (extend g' 0 argT) ty_ext)
-  | TyVar #g x -> magic()
+  | TyVar #g x -> ok()
 
 val invariance_empty : #e:exp -> #t:typ ->
   typing empty e t -> g:env -> Tot ( typing g e t )
@@ -271,7 +271,7 @@ let red2_preserves_update g sigma t' u red_u red2_g = ok()
   (*       if x <> 0 *)
   (*       then *)
   (*         ( *)
-  (*           magic() *)
+  (*           ok() *)
   (*         ) *)
   (*       else *)
   (*         ( *)
