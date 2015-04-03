@@ -1,3 +1,10 @@
+(* 
+Proof from the lecture Semantics (https://www.ps.uni-saarland.de/courses/sem-ws11/) by Gert Smolka.
+
+Source: http://www.ps.uni-saarland.de/courses/sem-ws11/script/StlcTerm.html
+
+Slightly adapted.
+*)
 
 Set Implicit Arguments.
 
