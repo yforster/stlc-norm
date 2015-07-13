@@ -1,2 +1,3 @@
 # stlc-norm
-Prooff that STLC is normalizing in
+F* proof that STLC is normalizing
+by Yannick Forster, Lukas Krämer, and Franziska Müller (Saarland University)

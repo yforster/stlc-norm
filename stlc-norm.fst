@@ -12,7 +12,12 @@ val id : sub
 let id (x : var) = EVar x
                         
 val subst_id : e:exp -> Lemma (subst id e = e)
-let rec subst_id e = using_induction_hyp subst_id
+let rec subst_id e =
+  match e with
+  | EVar x -> ()
+  | EApp e1 e2 -> subst_id e1; subst_id e2
+  | ELam t e -> subst_id e
+(* by_induction_on e subst_id -- requires huge timeout (50s)! *)
 
 val update : sub -> var -> exp -> Tot sub                        
 let update s x v y = if y = x then v else s y
@@ -152,9 +157,41 @@ type red : typ -> exp -> Type =
             typing empty e (TArr t1 t2) ->
             halts e ->
             (e':exp -> red t1 e' -> Tot (red t2 (EApp e e'))) ->
-            red (TArr t1 t2) e       
-                
-val red_halts : #t:typ -> #e:exp -> red t e -> Tot (halts e)
+            red (TArr t1 t2) e
+(*
+stlc-norm.fst(151,2-151,9) : Error
+Constructor "R_arrow" fails the strict positivity check;
+ the constructed type occurs "red" occurs to the left of a pure function type
+
+The unavoidable happened, and it's even worse than in other places
+since here we really invert red quite a lot. And no, we don't yet have
+a solution for this, although there are some ideas around.
+
+assume type red : typ -> exp -> Type
+assume val r_bool :  #e:exp -> typing empty e TBool -> halts e -> Tot (red TBool e)
+assume val r_arrow : t1:typ -> t2:typ -> #e:exp ->
+            typing empty e (TArr t1 t2) ->
+            halts e ->
+            (e':exp -> red t1 e' -> Tot (red t2 (EApp e e'))) ->
+            Tot (red (TArr t1 t2) e)
+assume val red_inv : #t:typ -> #e:exp -> h:red t e -> Tot
+  (cor (cexists (fun t1 -> (cexists (fun t2 ->
+        h:(cand (typing empty e (TArr t1 t2))
+          (cand (halts e)
+            (e':exp -> red t1 e' ->
+                Tot (red t2 (EApp e e'))))){t = TArr t1 t2}))))
+      (h:(cand (typing empty e TBool) (halts e)){t = TBool}))
+
+val red_halts_new : #t:typ -> #e:exp -> red t e -> Tot (halts e)
+let red_halts_new t e h =
+  match red_inv h with
+  | IntroL h0 -> let (ExIntro t1 h1) = h0 in
+                 let (ExIntro t2 h2) = h1 in
+                 let (Conj _ (Conj h _)) = h2 in
+                 h   (* needed to write it like this to avoid #236 *)
+  | IntroR (Conj _ hh) -> hh
+ *)
+
 let red_halts t e h =
   match h with
   | R_arrow _ _ _ hh _ -> hh
