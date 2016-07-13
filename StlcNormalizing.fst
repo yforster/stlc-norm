@@ -176,8 +176,20 @@ Constructor "R_arrow" fails the strict positivity check;
 
 The unavoidable happened, and it's even worse than in other places
 since here we really invert red quite a lot. And no, we don't yet have
-a solution for this, although there are some ideas around.
+a solution for this, although there are some ideas around. *)
 
+(* With universes we should have a new solution for this, which is to
+   define red recursively. No clue how well this would work at this
+   point. Did a bit of progress below. *)
+
+val red' : t:typ -> e:exp -> Tot Type0 (decreases t)
+let rec red' t e =
+  cand (cand (typing empty e t) (halts e))
+  (match t with
+   | TBool -> ctrue
+   | TArr t1 t2 -> (e':exp -> red' t1 e' -> Tot (red' t2 (EApp e e'))))
+
+(*
 assume type red : typ -> exp -> Type
 assume val r_bool :  #e:exp -> typing empty e TBool -> halts e -> Tot (red TBool e)
 assume val r_arrow : t1:typ -> t2:typ -> #e:exp ->
@@ -209,11 +221,21 @@ let red_halts #t #e h =
   | R_arrow _ _ _ hh _ -> hh
   | R_bool _ hh -> hh
 
+val red'_halts : #t:typ -> #e:exp -> h:(red' t e) -> Tot (halts e)
+let red'_halts #t #e h =
+  match h with
+  | Conj (Conj _ h) _ -> h
+
 val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
 let red_typable_empty #t #e h =
   match h with
   | R_arrow k1 k2 ht k3 k4 -> ht
   | R_bool t_e ht -> t_e
+
+val red'_typable_empty : #t:typ -> #e:exp -> red' t e -> Tot (typing empty e t)
+let red'_typable_empty #t #e h =
+  match h with
+  | Conj (Conj h _) _ -> h
 
 val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e ->
 				     Tot (red t e') (decreases t)
@@ -221,7 +243,7 @@ let rec step_preserves_red e e' s_e_e' t h =
   match t with
   | TArr t1 t2 ->
      (match h with
-      | R_bool t_e ht -> R_bool t_e (red_halts h)
+      | R_bool t_e ht -> R_bool t_e (red_halts h) (* CH: isn't this an impossible case? *)
       | R_arrow t1 t2 ty_e h_e f ->
 	let has_typ_e' : (typing empty e' t) = preservation s_e_e' ty_e in
 	let p : (halts e') = match (step_preserves_halting e e' s_e_e') with | Conj pa pb -> pa h_e in
@@ -238,6 +260,41 @@ let rec step_preserves_red e e' s_e_e' t h =
 	   | Conj pa pb -> pa ht in
 	 R_bool has_typ_e' p )
 
+val step_preserves_red' : e1:exp -> e2:exp -> step e1 e2 -> t:typ -> red' t e1 ->
+				     Tot (red' t e2) (decreases t)
+let rec step_preserves_red' e1 e2 s t h =
+  match h with
+  | Conj (Conj h1 h2) h3 ->
+    let Conj h2' _ = step_preserves_halting e1 e2 s in
+    let h1' = preservation s h1 in
+    Conj (Conj h1' (h2' h2)) (
+      match t with
+      | TArr t1 t2 ->
+        (* Take 1 -- could not prove postcondition *)
+        (* fun (e'':exp) -> fun (h':red' t1 e'') -> admit() *)
+
+        (*Take 2:*)
+        let aux (e3:exp) (h'':red' t1 e3) : Tot (red' t2 (EApp e2 e3)) =
+          (* Take 2.1 -- trying subtyping *)          
+          (* let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3)) = h3 in *)
+          (* expected type *)
+          (* (e3':StlcCbvDbParSubst.exp -> _:(StlcNormalizing.red' t1 e3'@0) ->
+             Tot (StlcNormalizing.red' t2 (StlcCbvDbParSubst.EApp e1 e3))); *)
+          (* got type (more or less) *)
+          (* (e':StlcCbvDbParSubst.exp -> _:(StlcNormalizing.red' t1@2 e'@0) ->
+             Tot (StlcNormalizing.red' t2@2 (StlcCbvDbParSubst.EApp e1 e'@1))) *)
+
+          (* Take 2.2 -- trying eta expansion, expecting h3 to be a function, it's a match *)
+          (* let h3' (e3':exp) (hh:red' t1 e3') : Tot (red' t2 (EApp e1 e3)) = h3 e3' hh in *)
+
+          (* Take 2.3 -- admitting type coercion for h3 *)
+          let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3)) = magic() in
+
+          let h' : (red' t2 (EApp e1 e3)) = h3' e3 h'' in
+          step_preserves_red' (EApp e1 e3) (EApp e2 e3) (SApp1 e3 s) t2 h'
+        in aux
+      | TBool -> I
+    )
 
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
 let rec steps_preserves_red e e' st_e_e' t h = magic()
@@ -249,8 +306,8 @@ let rec steps_preserves_red e e' st_e_e' t h =
      steps_preserves_red e'' e' st_e''_e' t (step_preserves_red e e'' s_e_e'' t h)
 *)
 
-val step_preserves_red' : e:exp -> e':exp -> step e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)
-let rec step_preserves_red' e e' s_e_e' t ty_t h =
+val back_step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)
+let rec back_step_preserves_red e e' s_e_e' t ty_t h =
    match t with
   | TArr t1 t2 ->
      (match h with | R_arrow t1 t2 ty_e h_e f ->
@@ -259,7 +316,7 @@ let rec step_preserves_red' e e' s_e_e' t ty_t h =
          fun e'' red_t1_e'' -> let h' : (red t2 (EApp e' e'')) = f e'' red_t1_e'' in
                                let ty_e'' : (typing empty e'' t1) = red_typable_empty red_t1_e'' in
                                let ty_app : (typing empty (EApp e e'') t2) = (TyApp ty_t ty_e'') in
-                               step_preserves_red' (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 ty_app h'
+                               back_step_preserves_red (EApp e e'') (EApp e' e'') (SApp1 e'' s_e_e') t2 ty_app h'
        in
 
        R_arrow t1 t2 ty_t p ff)
@@ -338,7 +395,7 @@ val red_exp_closed : #t:typ -> e:exp{not (is_value e)} ->
                      Tot (red t e)
 let red_exp_closed #t e ty_t f =
   let ExIntro e' h = progress ty_t in
-  step_preserves_red' e e' h t ty_t (f e' h)
+  back_step_preserves_red e e' h t ty_t (f e' h)
 
 val red_beta_induction : t1:typ -> t2:typ -> e:exp ->
                typing (extend empty 0 t1) e t2 ->
@@ -364,7 +421,7 @@ let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
 	| _ -> ok() (* the two cases above are exhaustive... *)
       )
      )
-  | Multi_refl same_e' -> step_preserves_red' (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
+  | Multi_refl same_e' -> back_step_preserves_red (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
 *)
 
 val red_beta : t1:typ -> t2:typ -> e:exp ->
