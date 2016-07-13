@@ -275,22 +275,13 @@ let rec step_preserves_red' e1 e2 s t h =
 
         (*Take 2:*)
         let aux (e3:exp) (h'':red' t1 e3) : Tot (red' t2 (EApp e2 e3)) =
-          (* Take 2.1 -- trying subtyping *)          
-          (* let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3)) = h3 in *)
-          (* expected type *)
-          (* (e3':StlcCbvDbParSubst.exp -> _:(StlcNormalizing.red' t1 e3'@0) ->
-             Tot (StlcNormalizing.red' t2 (StlcCbvDbParSubst.EApp e1 e3))); *)
-          (* got type (more or less) *)
-          (* (e':StlcCbvDbParSubst.exp -> _:(StlcNormalizing.red' t1@2 e'@0) ->
-             Tot (StlcNormalizing.red' t2@2 (StlcCbvDbParSubst.EApp e1 e'@1))) *)
 
-          (* Take 2.2 -- trying eta expansion, expecting h3 to be a function, it's a match *)
-          (* let h3' (e3':exp) (hh:red' t1 e3') : Tot (red' t2 (EApp e1 e3)) = h3 e3' hh in *)
+          (* Take 2.1 -- trying eta expansion, "expected a function" for h3, but it's a match *)
+          (* let h3' (e3':exp) (hh:red' t1 e3') : Tot (red' t2 (EApp e1 e3')) = h3 e3' hh in *)
 
-          (* Take 2.3 -- admitting type coercion for h3 *)
-          let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3)) = magic() in
-
-          let h' : (red' t2 (EApp e1 e3)) = h3' e3 h'' in
+          (* Take 2.2 -- trying subtyping and it does the trick *)
+          let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3')) = h3 in
+          let h' : (red' t2 (EApp e1 e3)) = h3' (* can't use h3 directly! "expected a function"*) e3 h'' in
           step_preserves_red' (EApp e1 e3) (EApp e2 e3) (SApp1 e3 s) t2 h'
         in aux
       | TBool -> I
