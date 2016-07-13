@@ -17,10 +17,10 @@ let rec subst_id e =
   | EVar x -> ()
   | EApp e1 e2 -> subst_id e1; subst_id e2
   | ELam t e -> subst_id e
-(* by_induction_on e subst_id -- requires huge timeout (50s)! *)
 
 val update : sub -> var -> exp -> Tot sub
 let update s x v y = if y = x then v else s y
+
 type closed (e : exp) = (forall y. not(appears_free_in y e))
 type closed2 (sigma:sub) = (forall x. sigma x <> EVar x ==> closed(sigma x))
 
@@ -33,7 +33,7 @@ let rec subst_closed e =
   match e with
   | EApp e1 e2 -> closed_app e1 e2; subst_closed e1; subst_closed e2
   | ELam t1 e1 -> admit() (* needs work, or different definition of closedness *)
-  | EVar _ -> () (* TODO: really silly that this is needed, filed as #576 *)
+  | EVar _ -> () (* actually unreachable case, now needed, but it's probably because of silly definition for closed *)
 
 val substitution_lemma' : #g:env -> g':env -> #e:exp -> #t:typ -> sigma:sub ->
                           typing g e t ->
@@ -72,12 +72,9 @@ let rec substitution_lemma #g g' #e #t sigma ty_g h2 =
                                                                      invariance_empty h g'')
                       (fun x t -> match h2 x t with | ExIntro s h -> ())
 
-
 val subst_update : x:var -> v:exp -> e:exp -> sigma:sub{closed2 sigma} ->
                    Lemma (subst_beta v (subst (subst_elam sigma) e) = subst (update (subst_elam sigma) 0 v) e)
-let rec subst_update x v e sigma = admit()
-
-(* TODO: verification loops for this
+let rec subst_update x v e sigma =
   match e with
   | EVar x -> if x > 0 then
                 (
@@ -93,16 +90,20 @@ let rec subst_update x v e sigma = admit()
                 )
   | EApp e1 e2 -> subst_update x v e1 sigma; subst_update x v e2 sigma
   | _ -> admit() (* fiddly *)
-*)
 
 (*** Evaluation and halting terms *)
 
-kind Relation (a:Type) = a -> a -> Type
+(* type relation (a:Type) = a -> a -> Type *)
 
 (* TODO this loops, filed as #575 *)
-type multi (a:Type) (r:Relation a) : a -> a -> Type =
+(* type multi (a:Type) (r:relation a) : a -> a -> Type = *)
+(* | Multi_refl : x:a -> multi a r x x *)
+(* | Multi_step : x:a -> y:a -> z:a -> r x y -> multi a r y z -> multi a r x z *)
+
+type multi (a:Type) (r:a -> a -> Type) : a -> a -> Type =
 | Multi_refl : x:a -> multi a r x x
 | Multi_step : x:a -> y:a -> z:a -> r x y -> multi a r y z -> multi a r x z
+
 type steps : exp -> exp -> Type = fun x y -> multi exp step x y
 type halts (e:exp) : Type = cexists (fun e' -> u:(steps e e'){is_value e'})
 
@@ -138,7 +139,9 @@ let rec step_deterministic e e' e'' step1 step2 =
      )
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))
-let rec step_preserves_halting e e' s_e_e' =
+let rec step_preserves_halting e e' s_e_e' = magic()
+(* TODO Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step
+        might be related to #208 and #417, or a new issue
   let p1 : (halts e -> Tot (halts e')) =
     fun (h : halts e) ->
     match h with | ExIntro v to_v ->
@@ -150,7 +153,7 @@ let rec step_preserves_halting e e' s_e_e' =
      match h with | ExIntro v to_v -> ExIntro v (Multi_step e e' v s_e_e' to_v)
   in
     Conj p1 p2
-
+*)
 
 (*** The relation red *)
 
@@ -200,17 +203,17 @@ let red_halts_new t e h =
   | IntroR (Conj _ hh) -> hh
  *)
 
-let red_halts t e h =
+val red_halts : #t:typ -> #e:exp -> h:(red t e) -> Tot (halts e)
+let red_halts #t #e h =
   match h with
   | R_arrow _ _ _ hh _ -> hh
   | R_bool _ hh -> hh
 
 val red_typable_empty : #t:typ -> #e:exp -> red t e -> Tot (typing empty e t)
-let red_typable_empty t e h =
+let red_typable_empty #t #e h =
   match h with
   | R_arrow k1 k2 ht k3 k4 -> ht
   | R_bool t_e ht -> t_e
-
 
 val step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> red t e ->
 				     Tot (red t e') (decreases t)
@@ -237,11 +240,14 @@ let rec step_preserves_red e e' s_e_e' t h =
 
 
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
+let rec steps_preserves_red e e' st_e_e' t h = magic()
+(* TODO Error: Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step")
 let rec steps_preserves_red e e' st_e_e' t h =
   match st_e_e' with
   | Multi_refl e''1 -> h
   | Multi_step e1 e'' e'1 s_e_e'' st_e''_e' ->
      steps_preserves_red e'' e' st_e''_e' t (step_preserves_red e e'' s_e_e'' t h)
+*)
 
 val step_preserves_red' : e:exp -> e':exp -> step e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)
 let rec step_preserves_red' e e' s_e_e' t ty_t h =
@@ -286,7 +292,7 @@ assume val typing_closed : #e:exp -> #t:typ -> typing empty e t -> Lemma (closed
 val red2_preserves_update :
     #g:env -> #sigma:sub -> t':typ -> u:exp -> red t' u ->
     red2 g sigma -> Tot ( red2 (extend g 0 t') (update (subst_elam sigma) 0 u) )
-let red2_preserves_update g sigma t' u red_u red2_g = ok()
+let red2_preserves_update #g #sigma t' u red_u red2_g = ok()
   (* Conj (fun (x:var) (t: typ{extend g 0 t' x == Some t}) -> *)
   (*       if x <> 0 *)
   (*       then *)
@@ -330,7 +336,7 @@ val red_exp_closed : #t:typ -> e:exp{not (is_value e)} ->
                      typing empty e t ->
                      ered t e ->
                      Tot (red t e)
-let red_exp_closed t e ty_t f =
+let red_exp_closed #t e ty_t f =
   let ExIntro e' h = progress ty_t in
   step_preserves_red' e e' h t ty_t (f e' h)
 
@@ -339,6 +345,9 @@ val red_beta_induction : t1:typ -> t2:typ -> e:exp ->
                (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta e' e))) ->
 	       e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v ->
 	       Tot (red t2 (EApp (ELam t1 e) e'))
+let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v = magic()
+(* TODO Error: Unexpected error; ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step")
+
 let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
   match steps_e'v with
   | Multi_step same_e' e'' same_v step_e'e'' mult_e''v ->
@@ -356,7 +365,7 @@ let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
       )
      )
   | Multi_refl same_e' -> step_preserves_red' (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
-
+*)
 
 val red_beta : t1:typ -> t2:typ -> e:exp ->
                typing (extend empty 0 t1) e t2 ->
@@ -369,8 +378,8 @@ let red_beta t1 t2 e ty_t2 f e' red_e' =
 
 val red2_closed' : #g : env -> #sigma : sub ->
                    red2 g sigma -> Lemma (closed2 sigma)
-let red2_closed' g sigma red2_g = ok_a() (* logically, this is trivial
-                                             but it needs at least another axiom *)
+let red2_closed' #g #sigma red2_g = ok_a() (* logically, this is trivial
+                                              but it needs at least another axiom *)
 
 (*** The main lemma and the final theorem *)
 
@@ -379,7 +388,7 @@ val main :
       red2 g sigma ->
       typing g e t ->
       Tot (red t (subst sigma e))
-let rec main e t t' g sigma red2_g ty_t =
+let rec main e #t #t' #g sigma red2_g ty_t =
   match ty_t with
   | TyVar x ->
      let Conj h1 h2 = red2_g in
@@ -410,7 +419,7 @@ let rec main e t t' g sigma red2_g ty_t =
 
 
 (* This may help to prove the following fact *)
-assume val exfalso_quodlibet : unit -> Tot 'a (requires (False)) (ensures True)
+assume val exfalso_quodlibet : unit -> Pure 'a (requires (False)) (ensures (fun _ -> True))
 
 val red2_id_empty : red2 empty id
 let red2_id_empty = Conj (fun x e -> exfalso_quodlibet()) (fun x t -> exfalso_quodlibet())
@@ -419,4 +428,7 @@ val normalization :
       #e:exp -> #t:typ ->
       typing empty e t ->
       Tot (halts e)
-let normalization e t ty = subst_id e; red_halts (main e id red2_id_empty ty)
+let normalization #e #t ty = magic()
+(* TODO Error: Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.empty) StlcCbvDbParSubst.empty")
+let normalization #e #t ty = subst_id e; red_halts (main e id red2_id_empty ty)
+*)
