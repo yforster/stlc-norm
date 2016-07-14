@@ -206,12 +206,9 @@ assume val red_inv : #t:typ -> #e:exp -> h:red t e -> Tot
       (h:(cand (typing empty e TBool) (halts e)){t = TBool}))
 
 val red_halts_new : #t:typ -> #e:exp -> red t e -> Tot (halts e)
-let red_halts_new t e h =
+let red_halts_new #t #e h =
   match red_inv h with
-  | IntroL h0 -> let (ExIntro t1 h1) = h0 in
-                 let (ExIntro t2 h2) = h1 in
-                 let (Conj _ (Conj h _)) = h2 in
-                 h   (* needed to write it like this to avoid #236 *)
+  | IntroL (ExIntro _ (ExIntro _ (Conj _ (Conj h _)))) -> h
   | IntroR (Conj _ hh) -> hh
  *)
 
