@@ -109,7 +109,8 @@ let subst_beta = subst_beta_gen 0
 (* Small-step operational semantics; strong / full-beta reduction is
    non-deterministic, so necessarily in inductive form *)
 
-type step : exp -> exp -> Type =
+(* CH: Type0 because of #604 *)
+noeq type step : exp -> exp -> Type0 =
   | SBeta : t:typ ->
             e1:exp ->
             e2:exp{is_value e2} ->
@@ -137,7 +138,7 @@ let extend g x t y = if y < x then g y
                      else if y = x then Some t
                      else g (y-1)
 
-type typing : env -> exp -> typ -> Type =
+noeq type typing : env -> exp -> typ -> Type =
   | TyVar : #g:env ->
             x:var{is_Some (g x)} ->
             typing g (EVar x) (Some.v (g x))

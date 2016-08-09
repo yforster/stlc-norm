@@ -93,41 +93,41 @@ let rec subst_update x v e sigma =
 
 (*** Evaluation and halting terms *)
 
-(* type relation (a:Type) = a -> a -> Type *)
+(* type relation (a:Type) = a -> a -> Type0 *)
 
-(* TODO this loops, filed as #575 *)
-(* type multi (a:Type) (r:relation a) : a -> a -> Type = *)
+(* TODO F* chokes on this, filed as #575 *)
+(* noeq type multi (a:Type) (r:relation a) : a -> a -> Type = *)
 (* | Multi_refl : x:a -> multi a r x x *)
 (* | Multi_step : x:a -> y:a -> z:a -> r x y -> multi a r y z -> multi a r x z *)
 
-type multi (a:Type) (r:a -> a -> Type) : a -> a -> Type =
+(* CH: Type0 because of #604 *)
+noeq type multi (a:Type) (r : a -> a -> Type0) : a -> a -> Type =
 | Multi_refl : x:a -> multi a r x x
 | Multi_step : x:a -> y:a -> z:a -> r x y -> multi a r y z -> multi a r x z
 
 type steps : exp -> exp -> Type = fun x y -> multi exp step x y
 type halts (e:exp) : Type = cexists (fun e' -> u:(steps e e'){is_value e'})
 
-
 val value_normal : v:exp{is_value v} -> Tot (halts v)
 let value_normal v = match v with | ELam _ _ -> ExIntro v (Multi_refl v)
 
-val step_deterministic : e:exp -> e':exp -> e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
-let rec step_deterministic e e' e'' step1 step2 =
+val step_deterministic : #e:exp -> #e':exp -> #e'':exp -> step e e' -> step e e'' -> Lemma (e' = e'')
+let rec step_deterministic #e #e' #e'' step1 step2 =
   match step1 with
   | SApp1 #fe1 fe2 #fe1' fstep_e1 ->
      (match step2 with
       | SApp1 #se1 se2 #se1' sstep_e1 ->
 	     assert(fe1 == se1);
-	     step_deterministic fe1 fe1' se1' fstep_e1 sstep_e1;
-	     step_deterministic se1 fe1' se1' fstep_e1 sstep_e1
+	     step_deterministic fstep_e1 sstep_e1;
+	     step_deterministic fstep_e1 sstep_e1
       | _ -> ()
      )
   | SApp2 fe1 #fe2 #fe2' fstep_e2 ->
      (match step2 with
       | SApp2 se1 #se2 #se2' sstep_e2 ->
 	     assert(fe2 == se2);
-	     step_deterministic fe2 fe2' se2' fstep_e2 sstep_e2;
-	     step_deterministic se2 fe2' se2' fstep_e2 sstep_e2
+	     step_deterministic fstep_e2 sstep_e2;
+	     step_deterministic fstep_e2 sstep_e2
       | SApp1 #se1 se2 #se1' sstep_e1 -> ()
       | _ -> ()
      )
@@ -139,21 +139,22 @@ let rec step_deterministic e e' e'' step1 step2 =
      )
 
 val step_preserves_halting : e:exp -> e':exp -> step e e' -> Tot (ciff (halts e) (halts e'))
-let rec step_preserves_halting e e' s_e_e' = magic()
-(* TODO Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step
-        might be related to #208 and #417, or a new issue
+let rec step_preserves_halting e e' s_e_e' =
   let p1 : (halts e -> Tot (halts e')) =
     fun (h : halts e) ->
     match h with | ExIntro v to_v ->
       match to_v with
-      | Multi_step e1 e'' e2 s_e_e'' st_e''_v -> step_deterministic e e' e'' s_e_e' s_e_e'';
-                                                 ExIntro v st_e''_v
+      | Multi_step e1 e'' v1 s_e_e'' st_e''_v -> magic()
+          (* CH (2016-08-09): TODO: This is a bit of a mess, but could not
+                                    reproduce in simpler setting (#605)
+          assert(v = v1); assert (e == e1); -- even these fail
+          step_deterministic #e1 #e' #e'' s_e_e' s_e_e''; ExIntro v st_e''_v *)
+      | _ -> admit() (* CH (2016-08-09): TODO: this fails now without the extra case *)
   in let p2 : (halts e' -> Tot (halts e)) =
      fun (h : halts e') ->
      match h with | ExIntro v to_v -> ExIntro v (Multi_step e e' v s_e_e' to_v)
   in
     Conj p1 p2
-*)
 
 (*** The relation red *)
 
@@ -162,7 +163,8 @@ although this definition is just fine (the type decreases);
 F* should have similar problems as soon as we start checking
 for negative occurrences. Hopefully by then we will also have
 a solution for this. *)
-type red : typ -> exp -> Type =
+(* CH: Type0 because of #604 *)
+noeq type red : typ -> exp -> Type0 =
 | R_bool :  #e:exp -> typing empty e TBool -> halts e -> red TBool e
 | R_arrow : t1:typ -> t2:typ -> #e:exp ->
             typing empty e (TArr t1 t2) ->
@@ -285,14 +287,14 @@ let rec step_preserves_red' e1 e2 s t h =
     )
 
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
-let rec steps_preserves_red e e' st_e_e' t h = magic()
-(* TODO Error: Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step")
 let rec steps_preserves_red e e' st_e_e' t h =
   match st_e_e' with
-  | Multi_refl e''1 -> h
+  | Multi_refl e''1 -> magic() (* #605: assert(e == e'); h *)
   | Multi_step e1 e'' e'1 s_e_e'' st_e''_e' ->
-     steps_preserves_red e'' e' st_e''_e' t (step_preserves_red e e'' s_e_e'' t h)
-*)
+     magic()
+     (* steps_preserves_red e'' e' st_e''_e' t (magic()) -- CH: TODO: probably same mess as above *)
+       (*step_preserves_red e e'' s_e_e'' t h -- CH: TODO: probably same mess as above*)
+  | _ -> admit() (* CH: TODO: super silly *)
 
 val back_step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)
 let rec back_step_preserves_red e e' s_e_e' t ty_t h =
@@ -390,9 +392,6 @@ val red_beta_induction : t1:typ -> t2:typ -> e:exp ->
                (e' : exp -> red t1 e' -> Tot (red t2 (subst_beta e' e))) ->
 	       e':exp -> red t1 e' -> v:exp{is_value v} -> steps e' v ->
 	       Tot (red t2 (EApp (ELam t1 e) e'))
-let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v = magic()
-(* TODO Error: Unexpected error; ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.step) StlcCbvDbParSubst.step")
-
 let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
   match steps_e'v with
   | Multi_step same_e' e'' same_v step_e'e'' mult_e''v ->
@@ -400,17 +399,20 @@ let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
      (fun exp_e (stp : step (EApp (ELam t1 e) e') exp_e) ->
       ( match stp with
 	| SApp2 lambda #same_e' #same_e'' stp_e' ->
-	   step_deterministic e' e'' same_e'' step_e'e'' stp_e';
-	   assert(exp_e == (EApp (ELam t1 e) e''));
-	   assert(multi exp step e'' v == steps e'' v);
-	   assert(same_v == v);
-	   red_beta_induction t1 t2 e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (ok())(*mult_e''v*)
+           (* -- TODO #605? (all of the below) *)
+	   (* step_deterministic step_e'e'' stp_e'; *)
+	   (* assert(exp_e == (EApp (ELam t1 e) e'')); *)
+	   (* assert(multi exp step e'' v == steps e'' v); *)
+	   (* assert(same_v == v); *)
+           (* red_beta_induction t1 t2 e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (ok())(*mult_e''v*)  *)
+	   magic()
 	| SBeta same_t1 same_e same_e' -> f e' red_e'
 	| _ -> ok() (* the two cases above are exhaustive... *)
       )
      )
-  | Multi_refl same_e' -> back_step_preserves_red (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
-*)
+  | Multi_refl same_e' -> assume(e' = v); (* TODO #605 *)
+      back_step_preserves_red (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
+  | _ -> admit() (* CH: TODO: super silly *)
 
 val red_beta : t1:typ -> t2:typ -> e:exp ->
                typing (extend empty 0 t1) e t2 ->
@@ -474,6 +476,6 @@ val normalization :
       typing empty e t ->
       Tot (halts e)
 let normalization #e #t ty = magic()
-(* TODO Error: Unexpected error ... Failure("NYI: eta_expand(Tm_fvar: StlcCbvDbParSubst.empty) StlcCbvDbParSubst.empty")
-let normalization #e #t ty = subst_id e; red_halts (main e id red2_id_empty ty)
-*)
+(* subst_id e; red_halts (main e id red2_id_empty ty) *)
+(* Expected expression of type "(StlcCbvDbParSubst.typing (fun x -> (StlcCbvDbParSubst.empty x@0)) e (?110270 e t ty))"; *)
+(* got expression "ty" of type "(StlcCbvDbParSubst.typing StlcCbvDbParSubst.empty e t)" *)
