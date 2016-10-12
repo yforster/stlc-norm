@@ -265,14 +265,17 @@ let rec step_preserves_red' e1 e2 s t h =
     Conj (Conj h1' (h2' h2)) (
       match t with
       | TArr t1 t2 ->
-        (* Take 1 -- could not prove postcondition *)
+        (* Filed simplified variants of this as #578 *)
+        (* Take 1 *)
         (* fun (e'':exp) -> fun (h':red' t1 e'') -> admit() *)
+(*         Expected type "(e'':StlcCbvDbParSubst.exp -> h':(StlcNormalizing.red' t1 e''@0) -> Tot (?79202 e1 e2 s t h h1 h2 h3 uu___ h2' uu___ h1' t1 t2 e''@1 h'@0))"; *)
+(*         got type "(?79134 e1 e2 s t h h1 h2 h3 uu___ h2' uu___ h1')" *)
 
         (*Take 2:*)
         let aux (e3:exp) (h'':red' t1 e3) : Tot (red' t2 (EApp e2 e3)) =
 
           (* Take 2.1 -- trying eta expansion, "expected a function" for h3, but it's a match *)
-          (* let h3' (e3':exp) (hh:red' t1 e3') : Tot (red' t2 (EApp e1 e3')) = h3 e3' hh in *)
+          (* let h' (e3':exp) (hh:red' t1 e3') : Tot (red' t2 (EApp e1 e3')) = h3 e3' hh in *)
 
           (* Take 2.2 -- trying subtyping and it does the trick *)
           let h3' : e3':exp -> red' t1 e3' -> Tot (red' t2 (EApp e1 e3')) = h3 in
