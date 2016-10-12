@@ -144,12 +144,8 @@ let rec step_preserves_halting e e' s_e_e' =
     fun (h : halts e) ->
     match h with | ExIntro v to_v ->
       match to_v with
-      | Multi_step e1 e'' v1 s_e_e'' st_e''_v -> magic()
-          (* CH (2016-08-09): TODO: This is a bit of a mess, but could not
-                                    reproduce in simpler setting (#605)
-          assert(v = v1); assert (e == e1); -- even these fail
-          step_deterministic #e1 #e' #e'' s_e_e' s_e_e''; ExIntro v st_e''_v *)
-      | _ -> admit() (* CH (2016-08-09): TODO: this fails now without the extra case *)
+      | Multi_step e1 e'' v1 s_e_e'' st_e''_v ->
+          step_deterministic #e1 #e' #e'' s_e_e' s_e_e''; ExIntro v st_e''_v
   in let p2 : (halts e' -> Tot (halts e)) =
      fun (h : halts e') ->
      match h with | ExIntro v to_v -> ExIntro v (Multi_step e e' v s_e_e' to_v)
@@ -289,12 +285,9 @@ let rec step_preserves_red' e1 e2 s t h =
 val steps_preserves_red : e:exp -> e':exp -> b:steps e e' -> t:typ -> red t e -> Tot (red t e') (decreases b)
 let rec steps_preserves_red e e' st_e_e' t h =
   match st_e_e' with
-  | Multi_refl e''1 -> magic() (* #605: assert(e == e'); h *)
+  | Multi_refl e''1 -> h
   | Multi_step e1 e'' e'1 s_e_e'' st_e''_e' ->
-     magic()
-     (* steps_preserves_red e'' e' st_e''_e' t (magic()) -- CH: TODO: probably same mess as above *)
-       (*step_preserves_red e e'' s_e_e'' t h -- CH: TODO: probably same mess as above*)
-  | _ -> admit() (* CH: TODO: super silly *)
+     steps_preserves_red e'' e' st_e''_e' t (step_preserves_red e e'' s_e_e'' t h)
 
 val back_step_preserves_red : e:exp -> e':exp -> step e e' -> t:typ -> typing empty e t -> red t e' -> Tot (red t e) (decreases t)
 let rec back_step_preserves_red e e' s_e_e' t ty_t h =
@@ -399,20 +392,18 @@ let rec red_beta_induction t1 t2 e ty_t2 f e' red_e' v steps_e'v =
      (fun exp_e (stp : step (EApp (ELam t1 e) e') exp_e) ->
       ( match stp with
 	| SApp2 lambda #same_e' #same_e'' stp_e' ->
-           (* -- TODO #605? (all of the below) *)
-	   (* step_deterministic step_e'e'' stp_e'; *)
-	   (* assert(exp_e == (EApp (ELam t1 e) e'')); *)
-	   (* assert(multi exp step e'' v == steps e'' v); *)
-	   (* assert(same_v == v); *)
-           (* red_beta_induction t1 t2 e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (ok())(*mult_e''v*)  *)
-	   magic()
+	   step_deterministic step_e'e'' stp_e';
+	   assert(exp_e == (EApp (ELam t1 e) e''));
+	   assert(multi exp step e'' v == steps e'' v);
+	   assert(same_v == v);
+           magic()
+           (* red_beta_induction t1 t2 e ty_t2 f e'' (step_preserves_red e' e'' step_e'e'' t1 red_e') v (admit())(\*mult_e''v*\) -- CH: need to figure this out *)
 	| SBeta same_t1 same_e same_e' -> f e' red_e'
 	| _ -> ok() (* the two cases above are exhaustive... *)
       )
      )
-  | Multi_refl same_e' -> assume(e' = v); (* TODO #605 *)
+  | Multi_refl same_e' ->
       back_step_preserves_red (EApp (ELam t1 e) e') (subst_beta e' e) (SBeta t1 e e') t2 (TyApp (TyLam #empty t1 #e #t2 ty_t2) (red_typable_empty #t1 #e' red_e')) (f e' red_e')
-  | _ -> admit() (* CH: TODO: super silly *)
 
 val red_beta : t1:typ -> t2:typ -> e:exp ->
                typing (extend empty 0 t1) e t2 ->
